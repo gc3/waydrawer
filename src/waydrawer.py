@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-hypr-drawer: GTK4 app drawer for Hyprland.
+waydrawer: GTK4 app drawer for Wayland.
 
 Features:
   - Reads .desktop files via Gio.AppInfo (uses your system icon theme)
@@ -13,14 +13,14 @@ Dependencies (Arch):
   sudo pacman -S python-gobject gtk4 gtk4-layer-shell
 
 Install:
-  chmod +x hypr-drawer
-  cp hypr-drawer ~/.local/bin/
+  chmod +x waydrawer
+  cp waydrawer ~/.local/bin/
 
 Hyprland keybind:
-  bind = SUPER, A, exec, hypr-drawer
+  bind = SUPER, A, exec, waydrawer
 
 Optional env:
-  HYPR_DRAWER_SEARCH_URL   # default: DuckDuckGo, e.g. "https://www.google.com/search?q={}"
+  WAYDRAWER_SEARCH_URL   # default: DuckDuckGo, e.g. "https://www.google.com/search?q={}"
 """
 from __future__ import annotations
 
@@ -51,12 +51,12 @@ if os.path.exists(_PRELOAD) and "gtk4-layer-shell" not in os.environ.get("LD_PRE
 
 
 # ---------- Config ----------
-APP_NAME = "hypr-drawer"
+APP_NAME = "waydrawer"
 CONFIG_DIR = Path(GLib.get_user_config_dir()) / APP_NAME
 FAVORITES_FILE = CONFIG_DIR / "favorites.json"
 
 SEARCH_URL = os.environ.get(
-    "HYPR_DRAWER_SEARCH_URL",
+    "WAYDRAWER_SEARCH_URL",
     "https://duckduckgo.com/?q={}",
 )
 
@@ -132,7 +132,7 @@ def launch_app(app: GioUnix.DesktopAppInfo) -> None:
     try:
         app.launch([], None)
     except GLib.Error as e:
-        print(f"[hypr-drawer] launch failed: {e}", file=sys.stderr)
+        print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
 
 def open_url(url: str) -> None:
     if not url.startswith(("http://", "https://", "file://")):
@@ -499,7 +499,7 @@ scrollbar slider { background-color: rgba(255,255,255,0.18); border-radius: 6px;
 class DrawerApp(Gtk.Application):
     def __init__(self):
         super().__init__(
-            application_id="org.local.hypr-drawer",
+            application_id="org.local.waydrawer",
             flags=Gio.ApplicationFlags.NON_UNIQUE,
         )
 
@@ -519,7 +519,7 @@ class DrawerApp(Gtk.Application):
         GLib.idle_add(win.search.grab_focus)
 
 def main():
-    lock_fd = open(f"/run/user/{os.getuid()}/hypr-drawer.lock", "w")
+    lock_fd = open(f"/run/user/{os.getuid()}/waydrawer.lock", "w")
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
