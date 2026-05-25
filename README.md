@@ -1,4 +1,4 @@
-# waydrawer
+# WayDrawer
 
 - app grid + basic launcher bar for wayland compositors
   - search for apps
