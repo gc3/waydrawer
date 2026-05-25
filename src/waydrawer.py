@@ -129,9 +129,31 @@ def matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
 
 # ---------- Launching ----------
 def launch_app(app: GioUnix.DesktopAppInfo) -> None:
+    cmdline = app.get_commandline()
+    if not cmdline:
+        # DBusActivatable or no Exec= — fall back to GIO
+        try:
+            app.launch([], None)
+        except GLib.Error as e:
+            print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+        return
     try:
-        app.launch([], None)
+        _ok, argv = GLib.shell_parse_argv(cmdline)
     except GLib.Error as e:
+        print(f"[waydrawer] failed to parse Exec=: {e}", file=sys.stderr)
+        return
+    # Strip .desktop field codes (%f %F %u %U %i %c %k ...)
+    argv = [a for a in argv if not (len(a) == 2 and a.startswith("%"))]
+    try:
+        subprocess.Popen(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+    except OSError as e:
         print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
 
 def open_url(url: str) -> None:
@@ -527,6 +549,11 @@ def main():
         print(APP_NAME+" already running. Exiting...")
         sys.exit(0)
 
+    try:
+        cg = open(f"/proc/{os.getpid()}/cgroup").read().strip()
+        Path("/tmp/waydrawer-cgroup.log").write_text(f"{cg}\n")
+    except OSError:
+        pass
 
     return DrawerApp().run(sys.argv)
 
