@@ -6,3 +6,4 @@
 - inspired by the gnome app drawer that I couldn't find anywhere else
   - so it uses GTK
 - tested on hyprland
+# test
