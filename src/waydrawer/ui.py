@@ -1,27 +1,3 @@
-#!/usr/bin/env python3
-"""
-waydrawer: GTK4 app drawer for Wayland.
-
-Features:
-  - Reads .desktop files via Gio.AppInfo (uses your system icon theme)
-  - Apps grouped by category (Internet, Development, Office, Media, etc.)
-  - Live filter as you type (matches name, generic name, keywords)
-  - Web search fallback when no apps match (Enter or click the row)
-  - Layer-shell overlay; Esc to close, Enter to launch first visible match
-
-Dependencies (Arch):
-  sudo pacman -S python-gobject gtk4 gtk4-layer-shell
-
-Install:
-  chmod +x waydrawer
-  cp waydrawer ~/.local/bin/
-
-Hyprland keybind:
-  bind = SUPER, A, exec, waydrawer
-
-Optional env:
-  WAYDRAWER_SEARCH_URL   # default: DuckDuckGo, e.g. "https://www.google.com/search?q={}"
-"""
 from __future__ import annotations
 
 import gi
@@ -30,7 +6,6 @@ gi.require_version("Gtk4LayerShell", "1.0")
 gi.require_version("GioUnix", "2.0")
 from gi.repository import GioUnix, Gtk, Gio, GLib, Gdk, Gtk4LayerShell as LayerShell
 
-import fcntl
 import json
 import os
 import re
@@ -40,85 +15,18 @@ import subprocess
 from pathlib import Path
 from urllib.parse import quote_plus
 
+import waydrawer.cache  as cache
+import waydrawer.config as config
+from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
-# XXX: The dynamic linker needs to load libgtk4-layer-shell.so before libwayland-client.so.
-#   This moves gtk4-layer-shell before libwayland-client in the linker options.
-#   See https://github.com/wmww/gtk4-layer-shell/blob/main/linking.md for more info
-_PRELOAD = "/usr/lib/x86_64-linux-gnu/libgtk4-layer-shell.so"
-if os.path.exists(_PRELOAD) and "gtk4-layer-shell" not in os.environ.get("LD_PRELOAD", ""):
-    os.environ["LD_PRELOAD"] = _PRELOAD
-    os.execv(sys.executable, [sys.executable] + sys.argv)
-
-
-# ---------- Config ----------
-APP_NAME = "waydrawer"
-CONFIG_DIR = Path(GLib.get_user_config_dir()) / APP_NAME
-FAVORITES_FILE = CONFIG_DIR / "favorites.json"
-
-SEARCH_URL = os.environ.get(
-    "WAYDRAWER_SEARCH_URL",
-    "https://duckduckgo.com/?q={}",
-)
+from pprint import pprint # XXX gc3: FIXME
 
 ICON_SIZE = 64
 COLUMNS = 6
 WINDOW_WIDTH = 1100
 WINDOW_HEIGHT = 720
 
-# .desktop Categories= -> display bucket. First match wins.
-CATEGORY_MAP = {
-    "AudioVideo": "Media", "Audio": "Media", "Video": "Media",
-    "Player": "Media", "Music": "Media",
-    "Development": "Development", "IDE": "Development",
-    "Education": "Education",
-    "Game": "Games",
-    "Graphics": "Graphics", "Photography": "Graphics",
-    "Network": "Internet", "WebBrowser": "Internet",
-    "Email": "Internet", "Chat": "Internet", "InstantMessaging": "Internet",
-    "Office": "Office", "WordProcessor": "Office", "Spreadsheet": "Office",
-    "Science": "Science",
-    "Settings": "System", "System": "System",
-    "Utility": "Utilities", "Accessories": "Utilities",
-}
-
-CATEGORY_ORDER = [
-    "Internet", "Development", "Office", "Graphics", "Media",
-    "Games", "Utilities", "System", "Education", "Science", "Other",
-]
-
-# ---------- Favorites ----------
-def load_favorites() -> list[str]:
-    try:
-        return json.loads(FAVORITES_FILE.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-def save_favorites(ids: list[str]) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    FAVORITES_FILE.write_text(json.dumps(ids, indent=2))
-
-
-# ---------- App discovery ----------
-def categorize(app: GioUnix.DesktopAppInfo) -> str:
-    raw = app.get_categories() or ""
-    for c in raw.split(";"):
-        if c and c in CATEGORY_MAP:
-            return CATEGORY_MAP[c]
-    return "Other"
-
-def load_apps() -> dict[str, list[GioUnix.DesktopAppInfo]]:
-    buckets: dict[str, list[GioUnix.DesktopAppInfo]] = {}
-    for app in Gio.AppInfo.get_all():
-        if not isinstance(app, GioUnix.DesktopAppInfo):
-            continue
-        if app.get_nodisplay() or not app.should_show():
-            continue
-        buckets.setdefault(categorize(app), []).append(app)
-    for b in buckets.values():
-        b.sort(key=lambda a: (a.get_display_name() or "").lower())
-    return buckets
-
-def matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
+def _matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
     if not q:
         return True
     name = (app.get_display_name() or "").lower()
@@ -126,9 +34,8 @@ def matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
     keywords = " ".join(app.get_keywords() or []).lower()
     return q in name or q in generic or q in keywords
 
-
 # ---------- Launching ----------
-def launch_app(app: GioUnix.DesktopAppInfo) -> None:
+def _launch_app(app: GioUnix.DesktopAppInfo) -> None:
     cmdline = app.get_commandline()
     if not cmdline:
         # DBusActivatable or no Exec= — fall back to GIO
@@ -142,6 +49,7 @@ def launch_app(app: GioUnix.DesktopAppInfo) -> None:
     except GLib.Error as e:
         print(f"[waydrawer] failed to parse Exec=: {e}", file=sys.stderr)
         return
+
     # Strip .desktop field codes (%f %F %u %U %i %c %k ...)
     argv = [a for a in argv if not (len(a) == 2 and a.startswith("%"))]
     try:
@@ -156,9 +64,10 @@ def launch_app(app: GioUnix.DesktopAppInfo) -> None:
     except OSError as e:
         print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
 
-def open_url(url: str) -> None:
+def _open_url(url: str) -> None:
     if not url.startswith(("http://", "https://", "file://")):
         url = "https://" + url
+
     subprocess.Popen(
         ["xdg-open", url],
         stdout=subprocess.DEVNULL,
@@ -166,15 +75,17 @@ def open_url(url: str) -> None:
         start_new_session=True,
     )
 
-def web_search(query: str) -> None:
-    open_url(SEARCH_URL.format(quote_plus(query)))
+def _web_search(query: str) -> None:
+    _open_url(SEARCH_URL.format(quote_plus(query)))
 
-def looks_like_url(s: str) -> bool:
+def _looks_like_url(s: str) -> bool:
     s = s.strip()
     if not s or " " in s:
         return False
+
     if s.startswith(("http://", "https://", "file://")):
         return True
+
     return bool(re.match(r"^[\w.-]+\.[a-z]{2,}(/.*)?$", s, re.IGNORECASE))
 
 
@@ -233,14 +144,15 @@ class AppTile(Gtk.Button):
         self.drawer._pending_favorite_toggle = app_id
         popover.popup()
 
+# ---------- Widgets ----------
 class Drawer(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application):
-        super().__init__(application=app, title=APP_NAME)
+        super().__init__(application=app, title=config.APP_NAME)
         self.set_default_size(WINDOW_WIDTH, WINDOW_HEIGHT)
 
         # make this an overlay
         LayerShell.init_for_window(self)
-        LayerShell.set_namespace(self, APP_NAME)
+        LayerShell.set_namespace(self, config.APP_NAME)
         LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
         LayerShell.set_keyboard_mode(self, LayerShell.KeyboardMode.EXCLUSIVE)
 
@@ -260,12 +172,12 @@ class Drawer(Gtk.ApplicationWindow):
         LayerShell.set_margin(self, LayerShell.Edge.RIGHT, 200)
 
         # load in all the app data from the .desktop files
-        self.apps_by_category = load_apps()
-        self.all_apps_by_id = {
-            a.get_id(): a
-            for apps in self.apps_by_category.values()
-            for a in apps
-        }
+        self.apps_by_category = dict(cache.load_apps())
+        self.all_apps_by_id = {}
+        for cat, apps in self.apps_by_category.items(): # apps = list of app dict
+          for a in apps:                        # a = single app dict
+            self.all_apps_by_id[a.id] = a
+
         self.favorites: list[str] = [
             i for i in load_favorites() if i in self.all_apps_by_id
         ]
@@ -388,7 +300,7 @@ class Drawer(Gtk.ApplicationWindow):
         return False
 
     def _activate_app(self, app: GioUnix.DesktopAppInfo):
-        launch_app(app)
+        _launch_app(app)
         self.get_application().quit()
 
     def _on_search_changed(self, entry: Gtk.SearchEntry):
@@ -415,13 +327,13 @@ class Drawer(Gtk.ApplicationWindow):
         any_visible = False
         for cat, header, flow in self._categories:
             apps = self.apps_by_category.get(cat, [])
-            has_match = any(matches(a, q) for a in apps)
+            has_match = any(_matches(a, q) for a in apps)
             header.set_visible(has_match)
             flow.set_visible(has_match)
             if has_match:
                 any_visible = True
                 flow.set_filter_func(
-                    lambda child, qq=q: matches(child.get_child().app, qq)
+                    lambda child, qq=q: _matches(child.get_child().app, qq)
                 )
                 flow.invalidate_filter()
 
@@ -429,7 +341,7 @@ class Drawer(Gtk.ApplicationWindow):
             self.web_row.set_visible(False)
         else:
             raw = entry.get_text().strip()
-            if looks_like_url(raw):
+            if _looks_like_url(raw):
                 self.web_row.set_label(f"  Open  {raw}")
             else:
                 self.web_row.set_label(f"  Search the web for  \u201c{raw}\u201d")
@@ -441,7 +353,7 @@ class Drawer(Gtk.ApplicationWindow):
             return None
         for cat, _h, _flow in self._categories:
             for app in self.apps_by_category.get(cat, []):
-                if matches(app, q):
+                if _matches(app, q):
                     return app
         return None
 
@@ -454,23 +366,24 @@ class Drawer(Gtk.ApplicationWindow):
         if app:
             self._activate_app(app)
             return
-        if looks_like_url(raw):
-            open_url(raw)
+        if _looks_like_url(raw):
+            _open_url(raw)
         else:
-            web_search(raw)
+            _web_search(raw)
         self.get_application().quit()
 
     def _on_web_clicked(self, _btn):
         raw = self.search.get_text().strip()
         if not raw:
             return
-        if looks_like_url(raw):
-            open_url(raw)
+        if _looks_like_url(raw):
+            _open_url(raw)
         else:
-            web_search(raw)
+            _web_search(raw)
         self.get_application().quit()
 
 # ---------- Styling ----------
+# XXX gc3: FIXME comments and own file pls
 CSS = b"""
 window { background-color: rgba(20, 22, 28, 0.94); }
 
@@ -516,47 +429,33 @@ scrollbar { background: transparent; }
 scrollbar slider { background-color: rgba(255,255,255,0.18); border-radius: 6px; }
 """
 
+def setup_CSS() -> None:
+  provider = Gtk.CssProvider()
+  if hasattr(provider, "load_from_string"):
+    provider.load_from_string(CSS.decode())
 
-# ---------- App entry ----------
-class DrawerApp(Gtk.Application):
-    def __init__(self):
-        super().__init__(
-            application_id="org.local.waydrawer",
-            flags=Gio.ApplicationFlags.NON_UNIQUE,
-        )
+  else:
+    provider.load_from_data(CSS, -1)
 
-    def do_activate(self):
-        provider = Gtk.CssProvider()
-        if hasattr(provider, "load_from_string"):
-            provider.load_from_string(CSS.decode())
-        else:
-            provider.load_from_data(CSS, -1)
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
-        win = Drawer(self)
-        win.present()
-        GLib.idle_add(win.search.grab_focus)
+  Gtk.StyleContext.add_provider_for_display(
+    Gdk.Display.get_default(),
+    provider,
+    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+  )
 
-def main():
-    lock_fd = open(f"/run/user/{os.getuid()}/waydrawer.lock", "w")
+
+# ---------- Favorites ----------
+# XXX gc3: FIXME comments and own file pls
+FAVORITES_FILE = config.CONFIG_DIR / "favorites.json"
+
+def load_favorites() -> list[str]:
     try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return json.loads(FAVORITES_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
-    except BlockingIOError:
-        print(APP_NAME+" already running. Exiting...")
-        sys.exit(0)
-
-    try:
-        cg = open(f"/proc/{os.getpid()}/cgroup").read().strip()
-        Path("/tmp/waydrawer-cgroup.log").write_text(f"{cg}\n")
-    except OSError:
-        pass
-
-    return DrawerApp().run(sys.argv)
+def save_favorites(ids: list[str]) -> None:
+    config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    FAVORITES_FILE.write_text(json.dumps(ids, indent=2))
 
 
-if __name__ == "__main__":
-    sys.exit(main())
