@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 
 build: $(PYZ)
 
-$(PYZ): src/waydrawer/*.py src/waydrawer/style.css
+$(PYZ): src/waydrawer/*.py config/style.css
 	mkdir -p dist
 	python -m zipapp src/waydrawer -o $@ -p "/usr/bin/env python3" -c
 
