@@ -3,10 +3,12 @@ STAGING := build/staging
 PREFIX  ?= $(HOME)/.local
 
 build: $(PYZ)
+
 $(PYZ): src/waydrawer/*.py config/style.css
+	rm -rf $(STAGING)
 	mkdir -p $(STAGING) dist
 	cp -r src/waydrawer $(STAGING)/waydrawer
-	cp src/waydrawer/__main__.py $(STAGING)/__main__.py
+	echo 'from waydrawer.__main__ import main; main()' > $(STAGING)/__main__.py
 	python -m zipapp $(STAGING) -o $@ -p "/usr/bin/env python3" -c
 
 install: build

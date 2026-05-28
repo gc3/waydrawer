@@ -1,3 +1,9 @@
+# ----------- User Interface for waydrawer -------------------------------------
+#
+# Using Gtk, we build the needed widgets and helpers to define the UI. The
+# handling of styling from the config files is done in style.py and applied in
+# main()
+#
 from __future__ import annotations
 
 import gi
@@ -11,15 +17,14 @@ import os
 import re
 import sys
 import subprocess
-
-from pathlib import Path
 from urllib.parse import quote_plus
 
-import waydrawer.cache  as cache
-import waydrawer.config as config
-from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
+import waydrawer.cache      as cache
+import waydrawer.config     as config
+import waydrawer.favorites  as favs
 
-from pprint import pprint # XXX gc3: FIXME
+from waydrawer.math import try_math
+from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
 ICON_SIZE = 64
 COLUMNS = 6
@@ -35,6 +40,7 @@ def _matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
     return q in name or q in generic or q in keywords
 
 # ---------- Launching ----------
+# XXX gc3: FIXME comments in here and spacing ...
 def _launch_app(app: GioUnix.DesktopAppInfo) -> None:
     cmdline = app.get_commandline()
     if not cmdline:
@@ -76,7 +82,7 @@ def _open_url(url: str) -> None:
     )
 
 def _web_search(query: str) -> None:
-    _open_url(SEARCH_URL.format(quote_plus(query)))
+    _open_url(config.SEARCH_URL.format(quote_plus(query)))
 
 def _looks_like_url(s: str) -> bool:
     s = s.strip()
@@ -127,6 +133,18 @@ class AppTile(Gtk.Button):
         right_click.connect("pressed", self._on_right_click)
         self.add_controller(right_click)
 
+
+    # NB: Direct toggle (no menu) because popovers don't route input correctly
+    # through gtk4-layer-shell on this stack, so we skip the confirmation step.
+    def _on_right_click(self, _gesture, _n_press, x, y):
+        app_id = self.app.get_id()
+        if app_id in self.drawer.favorites:
+            self.drawer.favorites.remove(app_id)
+        else:
+            self.drawer.favorites.append(app_id)
+        favs.save_favorites(self.drawer.favorites)
+        self.drawer._rebuild_favorites_row()
+    """
     def _on_right_click(self, _gesture, _n_press, x, y):
         app_id = self.app.get_id()
         is_fav = app_id in self.drawer.favorites
@@ -137,12 +155,18 @@ class AppTile(Gtk.Button):
         else:
           menu.append("Pin to favorites", "win.toggle-favorite")
 
+        rect = Gdk.Rectangle()
+        rect.x = int(x)
+        rect.y = int(y)
+        rect.width = 1
+        rect.height = 1
         popover = Gtk.PopoverMenu.new_from_model(menu)
         popover.set_parent(self)
         popover.set_position(Gtk.PositionType.BOTTOM)
-        popover.set_pointing_to(Gdk.Rectangle(x=int(x), y=int(y), width=1, height=1))
+        popover.set_pointing_to(rect)
         self.drawer._pending_favorite_toggle = app_id
         popover.popup()
+    """
 
 # ---------- Widgets ----------
 class Drawer(Gtk.ApplicationWindow):
@@ -179,7 +203,7 @@ class Drawer(Gtk.ApplicationWindow):
             self.all_apps_by_id[a.id] = a
 
         self.favorites: list[str] = [
-            i for i in load_favorites() if i in self.all_apps_by_id
+            i for i in favs.load_favorites() if i in self.all_apps_by_id
         ]
         self._pending_favorite_toggle: str | None = None
         self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
@@ -288,7 +312,7 @@ class Drawer(Gtk.ApplicationWindow):
             self.favorites.remove(app_id)
         else:
             self.favorites.append(app_id)
-        save_favorites(self.favorites)
+        favs.save_favorites(self.favorites)
         self._rebuild_favorites_row()
 
     # ----- handlers -----
@@ -341,10 +365,16 @@ class Drawer(Gtk.ApplicationWindow):
             self.web_row.set_visible(False)
         else:
             raw = entry.get_text().strip()
-            if _looks_like_url(raw):
-                self.web_row.set_label(f"  Open  {raw}")
+            result = try_math(raw)
+            if result is not None:
+              self.web_row.set_label(f"  Math result is {result}")
+
+            elif _looks_like_url(raw):
+              self.web_row.set_label(f"  Open  {raw}")
+
             else:
-                self.web_row.set_label(f"  Search the web for  \u201c{raw}\u201d")
+              self.web_row.set_label(f"  Search the web for  \u201c{raw}\u201d")
+
             self.web_row.set_visible(True)
 
     def _first_visible_app(self):
@@ -358,104 +388,46 @@ class Drawer(Gtk.ApplicationWindow):
         return None
 
     def _on_search_activate(self, entry: Gtk.SearchEntry):
+        """ Handler for hitting enter in the search bar"""
         raw = entry.get_text().strip()
         if not raw:
             return
+
         self._current_query = raw.lower()  # sync before lookup
-        app = self._first_visible_app()
-        if app:
-            self._activate_app(app)
-            return
-        if _looks_like_url(raw):
-            _open_url(raw)
+
+        if (result := try_math(raw)) is not None:
+          clipboard = Gdk.Display.get_default().get_clipboard()
+          clipboard.set(result)
+          self.web_row.set_label(f"  Math result is copied to clipboard!")
+          return
+
+        if (app := self._first_visible_app()) is not None:
+          self._activate_app(app)
+
+        elif _looks_like_url(raw):
+          _open_url(raw)
+
         else:
-            _web_search(raw)
+          _web_search(raw)
+
         self.get_application().quit()
 
     def _on_web_clicked(self, _btn):
+        """ Handler for clicking the button at the bottom of the results"""
         raw = self.search.get_text().strip()
         if not raw:
-            return
+          return
+
+        if (result  := try_math(raw)) is not None:
+          clipboard = Gdk.Display.get_default().get_clipboard()
+          clipboard.set(result)
+          self.web_row.set_label(f"  Math result is copied to clipboard!")
+          return
+
         if _looks_like_url(raw):
-            _open_url(raw)
+          _open_url(raw)
+
         else:
-            _web_search(raw)
+          _web_search(raw)
+
         self.get_application().quit()
-
-# ---------- Styling ----------
-# XXX gc3: FIXME comments and own file pls
-CSS = b"""
-window { background-color: rgba(20, 22, 28, 0.94); }
-
-entry {
-  font-size: 16px;
-  padding: 12px;
-  border-radius: 10px;
-  background-color: transparent;
-  color: #eee;
-  caret-color: #cce;
-}
-entry:focus { background-color: rgba(255,255,255,0.10); }
-
-.category-header {
-  font-size: 12px;
-  font-weight: 700;
-  color: #99a;
-  letter-spacing: 0.08em;
-  margin-top: 6px;
-  margin-bottom: 2px;
-}
-
-.app-tile {
-  padding: 10px;
-  border-radius: 12px;
-  background: transparent;
-  border: none;
-}
-.app-tile:hover  { background-color: rgba(255,255,255,0.07); }
-.app-tile:active { background-color: rgba(255,255,255,0.12); }
-.app-tile label  { color: #e6e6ec; font-size: 12px; }
-
-.web-fallback {
-  padding: 12px;
-  border-radius: 10px;
-  background-color: rgba(120, 160, 255, 0.10);
-  color: #cfd8ff;
-  border: none;
-}
-.web-fallback:hover { background-color: rgba(120, 160, 255, 0.18); }
-
-scrollbar { background: transparent; }
-scrollbar slider { background-color: rgba(255,255,255,0.18); border-radius: 6px; }
-"""
-
-def setup_CSS() -> None:
-  provider = Gtk.CssProvider()
-  if hasattr(provider, "load_from_string"):
-    provider.load_from_string(CSS.decode())
-
-  else:
-    provider.load_from_data(CSS, -1)
-
-  Gtk.StyleContext.add_provider_for_display(
-    Gdk.Display.get_default(),
-    provider,
-    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-  )
-
-
-# ---------- Favorites ----------
-# XXX gc3: FIXME comments and own file pls
-FAVORITES_FILE = config.CONFIG_DIR / "favorites.json"
-
-def load_favorites() -> list[str]:
-    try:
-        return json.loads(FAVORITES_FILE.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-def save_favorites(ids: list[str]) -> None:
-    config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    FAVORITES_FILE.write_text(json.dumps(ids, indent=2))
-
-

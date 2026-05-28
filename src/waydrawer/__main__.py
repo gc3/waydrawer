@@ -1,3 +1,4 @@
+# ----------- waydraw Main App -------------------------------------------------
 # waydrawer: GTK4 app drawer for Wayland.
 #
 # Features:
@@ -5,27 +6,34 @@
 #   - Apps grouped by category (Internet, Development, Office, Media, etc.)
 #   - Live filter as you type (matches name, generic name, keywords)
 #   - Web search fallback when no apps match (Enter or click the row)
+#   - URL loading in browser if the input looks like a URL
+#   - Executes basic arithmetic in the search bar & copies results to clipboard
 #   - Layer-shell overlay; Esc to close, Enter to launch first visible match
 #
 # Dependencies:
 #   python-gobject gtk4 gtk4-layer-shell
 #
 # Install:
-#   chmod +x waydrawer
-#   cp waydrawer ~/.local/bin/
+#   make install
 #
-# Hyprland keybind:
-#   bind = SUPER, TAB, exec, waydrawer
+# Hyprland hyprlang keybind:
+#   bind = SUPER, Space, exec, waydrawer
 #
-# Optional env:
-#   WAYDRAWER_SEARCH_URL   # default: DuckDuckGo, e.g. "https://www.google.com/search?q={}"
-
+# Hyprland lua keybind:
+#   hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
+#
+# Configuration:
+#   ~/.config/waydrawer/config.toml
+#   ~/.config/waydrawer/style.css
+#
 from __future__ import annotations
 
 import os
 import sys
 import fcntl
-import waydrawer.ui as ui
+
+import waydrawer.ui     as ui
+import waydrawer.style  as style
 
 from pathlib import Path
 from gi.repository import GLib, Gtk, Gio
@@ -51,31 +59,25 @@ class DrawerApp(Gtk.Application):
     )
 
   def do_activate(self):
-    #ui.setup_CSS() # XXX gc3: FIXME re-enable CSS
+    style.setup_CSS()
 
     win = ui.Drawer(self)
     win.present()
     GLib.idle_add(win.search.grab_focus)
 
 def main():
+  # we only want 1 instance of this app running at a time
   lock_fd = open(f"/run/user/{os.getuid()}/waydrawer.lock", "w")
   try:
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
   except BlockingIOError:
-    print(APP_NAME+" already running. Exiting...")
+    print(APP_NAME + " already running. Exiting...")
     sys.exit(0)
-
-  try:
-    cg = open(f"/proc/{os.getpid()}/cgroup").read().strip()
-    Path("/tmp/waydrawer-cgroup.log").write_text(f"{cg}\n")
-  except OSError:
-    pass
 
   return DrawerApp().run(sys.argv)
 
 
-
-# run this thing
+# we like to run it, run it
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,10 +1,15 @@
-#Wrapper around cached .desktop data. Same surface as Gio.DesktopAppInfo
-#where it matters, backed by a dict — no parsing on construction.
+# ----------- DesktopAppInfo Wrapper -------------------------------------------
+#
+# This is a wrapper around cached .desktop data. Same surface as Gio.DesktopAppInfo
+# where it matters, backed by a dict — no parsing on construction. We create
+# this indirection so the caller doesn't have to know if this is a cached set of
+# app data or loaded by reading the .desktop file.
+#
+from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional
 from gi.repository import Gtk, Gdk, Gio
-
 
 @dataclass
 class App:
@@ -19,7 +24,6 @@ class App:
     keywords: List[str] = field(default_factory=list)
 
     # --- methods that mirror the old DesktopAppInfo API ---
-
     def get_id(self) -> str:
         return self.id
 
@@ -53,33 +57,16 @@ class App:
           return Gio.FileIcon.new(Gio.File.new_for_path(self.icon))
 
       return Gio.ThemedIcon.new(self.icon)
-    """
-    def get_icon(self, size: int = 64) -> Gtk.Image:
-        # Returns a Gtk.Image ready to drop into a widget tree.
-        if not self.icon:
-            return Gtk.Image.new_from_icon_name("application-x-executable")
-        if self.icon.startswith("/"):
-            return Gtk.Image.new_from_file(self.icon)
-        theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
-        paintable = theme.lookup_icon(
-            self.icon, None, size, 1,
-            Gtk.TextDirection.NONE,
-            Gtk.IconLookupFlags.FORCE_REGULAR,
-        )
-        img = Gtk.Image.new_from_paintable(paintable)
-        img.set_pixel_size(size)
-        return img
-        """
 
     def launch(self) -> bool:
         """Reconstruct DesktopAppInfo and launch. Parse cost paid once, on use."""
         info = Gio.DesktopAppInfo.new_from_filename(self.filename)
         if info is None:
             return False
+
         return info.launch([], None)
 
     # --- serialization ---
-
     @classmethod
     def from_dict(cls, d: dict) -> "App":
         return cls(**d)

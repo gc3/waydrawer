@@ -1,7 +1,10 @@
-# ----------- App Cache -------------------------------------------------------
+# ----------- AppInfo Cache -------------------------------------------------------
 #
-#   XXX gc3: FIXME
+# Loading the Gio.AppInfo files from disk is one of the slowest operations
+# Waydrawer does, so we manage caching the results of reading all the .desktop files
+# here.
 #
+from __future__ import annotations
 
 import json
 import sys
@@ -12,10 +15,13 @@ from gi.repository import GLib, Gio
 from waydrawer.app import App
 from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
+# ----------- Constants -----------------------------------------------------------
 CACHE_DIR = Path(GLib.get_user_cache_dir()) / "waydrawer"
 APPS_CACHE = CACHE_DIR / "apps.json"
 CACHE_VERSION = 3  # bump if you change the schema
 
+
+# ----------- Internal Helpers ----------------------------------------------------
 def _app_dirs():
   """
     Gather all the directories containing .desktop files
@@ -26,7 +32,9 @@ def _app_dirs():
 
 def _serialize(info):
   """
-    XXX gc3: FIXME
+    Given a Gio.AppInfo, return one of our app wrappers. We use this as a layer
+    of indirection to callers so whether we load from cache or from Gio, they
+    see the same interface.
   """
   return App(
     id = info.get_id(),
