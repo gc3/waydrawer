@@ -1,9 +1,9 @@
 # ----------- AppInfo Cache -------------------------------------------------------
-#
-# Loading the Gio.AppInfo files from disk is one of the slowest operations
-# Waydrawer does, so we manage caching the results of reading all the .desktop files
-# here.
-#
+"""
+  Loading the Gio.AppInfo files from disk is one of the slowest operations
+  Waydrawer does, so we manage caching the results of reading all the .desktop files
+  here.
+"""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from gi.repository import GLib, Gio
 
-from waydrawer.app import App
+from waydrawer.app import AppInfo
 from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
 # ----------- Constants -----------------------------------------------------------
@@ -36,7 +36,7 @@ def _serialize(info):
     of indirection to callers so whether we load from cache or from Gio, they
     see the same interface.
   """
-  return App(
+  return AppInfo (
     id = info.get_id(),
     filename = info.get_filename(),
     name = info.get_display_name(),
@@ -74,7 +74,7 @@ def _categorize(apps):
 # ----------- API -------------------------------------------------------------
 def load_apps():
   """
-    Returns dict of {category => [App, ...]} where categories point to a list of
+    Returns dict of {category => [AppInfo, ...]} where categories point to a list of
     apps in that category. Apps are sorted alphabetically.
   """
 
@@ -85,14 +85,14 @@ def load_apps():
       cached = json.loads(APPS_CACHE.read_text())
       if cached.get("v") == CACHE_VERSION and cached.get("mtime") == mtime:
         # * HIT *
-        #   rehydrate dicts -> App instances and return
+        #   rehydrate dicts -> AppInfo instances and return
         result = []
         for cat, apps in cached["sections"]:
-          rehydrated = [App.from_dict(d) for d in apps]
+          rehydrated = [AppInfo.from_dict(d) for d in apps]
           result.append([cat, rehydrated])
         return result
 
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
       print(f"[waydrawer] cache read error: {e}", file=sys.stderr)
 
   # * MISS *
@@ -103,7 +103,7 @@ def load_apps():
   ]
   sections = _categorize(raw_apps)
 
-  #   serialize App -> dict for JSON and write them to the cache
+  #   serialize AppInfo -> dict for JSON and write them to the cache
   CACHE_DIR.mkdir(parents=True, exist_ok=True)
   APPS_CACHE.write_text(json.dumps({
     "v": CACHE_VERSION,

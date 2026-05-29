@@ -1,14 +1,13 @@
 # ----------- Favorites -------------------------------------------------------
-#
-# A simple module for tracking which apps have been 'favorited' by the user.
-#
+"""
+  A simple module for tracking which apps have been 'favorited' by the user.
+"""
 from __future__ import annotations
 
-import sys
 import json
-import waydrawer.config as config
+from waydrawer.config import CONFIG_DIR
 
-FAVORITES_FILE = config.CONFIG_DIR / "favorites.json"
+FAVORITES_FILE = CONFIG_DIR / "favorites.json"
 
 def load_favorites() -> list[str]:
   """ Load favorites from the config directory """
@@ -20,5 +19,5 @@ def load_favorites() -> list[str]:
 
 def save_favorites(ids: list[str]) -> None:
   """ Write out favorites to the config directory """
-  config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+  CONFIG_DIR.mkdir(parents=True, exist_ok=True)
   FAVORITES_FILE.write_text(json.dumps(ids, indent=2))

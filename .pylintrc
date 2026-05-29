@@ -1,0 +1,4 @@
+# .pylintrc
+
+[FORMAT]
+indent-string='  '

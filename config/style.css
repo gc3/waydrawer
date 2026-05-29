@@ -1,1 +1,70 @@
-/* example / default */
+/* waydrawer example style.css -- different than the defaults */
+
+window {
+  background-color: rgba(20, 22, 28, 0.94);
+  font-family: "Adwaita Sans";
+  font-size: 14px;
+}
+
+/* search bar */
+entry {
+  padding: 12px;
+  border-radius: 5px;
+  background-color: transparent;
+  color: #eeeeee;
+  caret-color: #cce;
+  outline: none;
+  border-bottom: 1px solid #00b4d8;
+  border-radius: 0;
+}
+
+entry:focus {
+  background-color: rgba(255,255,255,0.10);
+}
+
+/* scroll bar on right side of app grid */
+scrollbar {
+  background: transparent;
+}
+scrollbar slider {
+  background-color: rgba(255,255,255,0.18);
+  border-radius: 6px;
+}
+
+/* app grid category name */
+.category-header {
+  color: #CB8EA9;
+  font-size: 18px;
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+/* app grid entry */
+.app-tile {
+  padding: 10px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  color: #00b4d8;
+}
+
+.app-tile:active {
+  background-color: alpha(#00b4d8, 0.50) ;
+}
+
+.app-tile:hover label  {
+  color: #CB8EA9;
+}
+
+/* non-app results section */
+.web-fallback {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: rgba(120, 160, 255, 0.10);
+  color: #cfd8ff;
+  border: none;
+}
+
+.web-fallback:hover {
+  background-color: rgba(120, 160, 255, 0.18);
+}
