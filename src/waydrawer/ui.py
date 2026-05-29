@@ -31,6 +31,9 @@ COLUMNS = 6
 WINDOW_WIDTH = 1100
 WINDOW_HEIGHT = 720
 
+# XXX gc3: FIXME comments in here and spacing ...
+
+# ----------- Helper Functions -------------------------------------------------
 def _matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
     if not q:
         return True
@@ -39,8 +42,6 @@ def _matches(app: GioUnix.DesktopAppInfo, q: str) -> bool:
     keywords = " ".join(app.get_keywords() or []).lower()
     return q in name or q in generic or q in keywords
 
-# ---------- Launching ----------
-# XXX gc3: FIXME comments in here and spacing ...
 def _launch_app(app: GioUnix.DesktopAppInfo) -> None:
     cmdline = app.get_commandline()
     if not cmdline:
@@ -95,8 +96,10 @@ def _looks_like_url(s: str) -> bool:
     return bool(re.match(r"^[\w.-]+\.[a-z]{2,}(/.*)?$", s, re.IGNORECASE))
 
 
-# ---------- Widgets ----------
+# ----------- Widgets ----------------------------------------------------------
 class AppTile(Gtk.Button):
+    """ A single app grid entry that launches an app on click """
+
     def __init__(self, app: GioUnix.DesktopAppInfo, drawer: "Drawer"):
         super().__init__()
         self.app = app
@@ -168,8 +171,9 @@ class AppTile(Gtk.Button):
         popover.popup()
     """
 
-# ---------- Widgets ----------
 class Drawer(Gtk.ApplicationWindow):
+    """ The app grid + launcher that makes up the 'drawer' """
+
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title=config.APP_NAME)
         self.set_default_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -209,23 +213,25 @@ class Drawer(Gtk.ApplicationWindow):
         self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
         self._current_query = ""
 
-        # Action for the popover menu
+        # action for the popover menu
         toggle_action = Gio.SimpleAction.new("toggle-favorite", None)
         toggle_action.connect("activate", self._on_toggle_favorite)
         self.add_action(toggle_action)
 
+        # UI Construction!
+        #   the drawer container box
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(24)
         root.set_margin_bottom(24)
         root.set_margin_start(28)
         root.set_margin_end(28)
 
+        #   search bar on top
         self.search = Gtk.SearchEntry()
         self.search.set_placeholder_text("Search apps, type a URL, or query the web…")
         self.search.connect("search-changed", self._on_search_changed)
         self.search.connect("activate", self._on_search_activate)
         root.append(self.search)
-
 
         self.web_row = Gtk.Button()
         self.web_row.add_css_class("web-fallback")
@@ -237,9 +243,10 @@ class Drawer(Gtk.ApplicationWindow):
         scroller.set_vexpand(True)
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
+        #   app grid on bottom
         self.grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
 
-        # Favorites row (above categories)
+        #     favorites row (above categories)
         self.fav_header = Gtk.Label(label="Favorites", xalign=0)
         self.fav_header.add_css_class("category-header")
         self.fav_flow = Gtk.FlowBox()
@@ -253,6 +260,7 @@ class Drawer(Gtk.ApplicationWindow):
         self.grid_box.append(self.fav_flow)
         self._rebuild_favorites_row()
 
+        #     fill in the apps by category
         for cat in CATEGORY_ORDER:
             apps = self.apps_by_category.get(cat, [])
             if not apps:
@@ -303,6 +311,7 @@ class Drawer(Gtk.ApplicationWindow):
             if app:
                 self.fav_flow.append(AppTile(app, self))
 
+    # ----- action handlers -----
     def _on_toggle_favorite(self, _action, _param):
         app_id = self._pending_favorite_toggle
         self._pending_favorite_toggle = None
@@ -315,17 +324,12 @@ class Drawer(Gtk.ApplicationWindow):
         favs.save_favorites(self.favorites)
         self._rebuild_favorites_row()
 
-    # ----- handlers -----
     def _on_key_pressed(self, _kc, keyval, _kc2, _state):
         if keyval == Gdk.KEY_Escape:
             self.get_application().quit()
             return True
 
         return False
-
-    def _activate_app(self, app: GioUnix.DesktopAppInfo):
-        _launch_app(app)
-        self.get_application().quit()
 
     def _on_search_changed(self, entry: Gtk.SearchEntry):
         q = entry.get_text().strip().lower()
@@ -377,57 +381,50 @@ class Drawer(Gtk.ApplicationWindow):
 
             self.web_row.set_visible(True)
 
-    def _first_visible_app(self):
-        q = self._current_query
-        if not q:
-            return None
-        for cat, _h, _flow in self._categories:
-            for app in self.apps_by_category.get(cat, []):
-                if _matches(app, q):
-                    return app
-        return None
+
+    def _handle_non_apps(self, text):
+      """ handle the execution of non-app search features """
+      if (result := try_math(text)) is not None:
+        # XXX gc3: FIXME -- this clipboard copy doesnt workoutside the app
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        clipboard.set(result)
+        self.web_row.set_label(f"  Math result is copied to clipboard!")
+        return
+
+      if _looks_like_url(raw):
+        _open_url(raw)
+
+      else:
+        _web_search(raw)
+
+      self.get_application().quit()
+
 
     def _on_search_activate(self, entry: Gtk.SearchEntry):
-        """ Handler for hitting enter in the search bar"""
-        raw = entry.get_text().strip()
-        if not raw:
-            return
-
-        self._current_query = raw.lower()  # sync before lookup
-
-        if (result := try_math(raw)) is not None:
-          clipboard = Gdk.Display.get_default().get_clipboard()
-          clipboard.set(result)
-          self.web_row.set_label(f"  Math result is copied to clipboard!")
+      """ Handler for hitting enter in the search bar """
+      raw = entry.get_text().strip()
+      if not raw:
           return
 
-        if (app := self._first_visible_app()) is not None:
-          self._activate_app(app)
+      self._current_query = raw.lower()  # sync before lookup
 
-        elif _looks_like_url(raw):
-          _open_url(raw)
+      # we first check for an app match and launch it
+      for cat, _h, _flow in self._categories:
+        for app in self.apps_by_category.get(cat, []):
+          if _matches(app, self._current_query):
+            _launch_app(app)
+            self.get_application().quit()
 
-        else:
-          _web_search(raw)
+      # then we check the other features
+      self._handle_non_apps(raw)
 
-        self.get_application().quit()
 
     def _on_web_clicked(self, _btn):
-        """ Handler for clicking the button at the bottom of the results"""
-        raw = self.search.get_text().strip()
-        if not raw:
-          return
+      """ Handler for clicking the button at the bottom of the results """
+      raw = self.search.get_text().strip()
+      if not raw:
+        return
 
-        if (result  := try_math(raw)) is not None:
-          clipboard = Gdk.Display.get_default().get_clipboard()
-          clipboard.set(result)
-          self.web_row.set_label(f"  Math result is copied to clipboard!")
-          return
-
-        if _looks_like_url(raw):
-          _open_url(raw)
-
-        else:
-          _web_search(raw)
-
-        self.get_application().quit()
+      # there's no button when we pick an app, so only have to handle the
+      # other features on a button click
+      self._handle_non_apps(raw)
