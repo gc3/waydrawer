@@ -48,5 +48,10 @@ hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
 ```
 
 ## Configuration
+Examples are 
+- config/config.toml
+- config/style.css
+
+Your files live at
 - ~/.config/waydrawer/config.toml
 - ~/.config/waydrawer/style.css
