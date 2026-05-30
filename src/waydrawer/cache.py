@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from gi.repository import GLib, Gio
 
-from waydrawer.app import AppInfo
+from waydrawer.app_info import AppInfo
 from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
 # ----------- Constants -----------------------------------------------------------

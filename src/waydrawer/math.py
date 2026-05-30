@@ -1,4 +1,4 @@
-# ----------- Math Eval for Search Bar------------------------------------------
+# ----------- Math Eval for Search Bar -----------------------------------------
 """
   Using AST to recursively see fi what we're looking at is a possible math
   operation and then evaluating it.
