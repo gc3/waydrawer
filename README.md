@@ -19,6 +19,7 @@
 - Layer-shell overlay; Esc to close, Enter to launch first visible match
 
 ## Dependencies
+Python:
 - python 3.11+ (for tomllib)
 - python-gobject, gtk4, gtk4-layer-shell, wl-clipboard, xdg-utils
 
