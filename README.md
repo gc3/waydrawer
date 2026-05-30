@@ -6,6 +6,7 @@
   - do basic math
   - fall back to websearch
   - open a website
+  - pin favorite apps
 - inspired by the gnome app drawer that I couldn't find anywhere else
 - tested on hyprland
 
@@ -13,6 +14,7 @@
 - Reads .desktop files (cached between runs) to find all your apps
 - Apps grouped by category (Internet, Office, etc.)
 - Live filter as you type (matches name, generic name, keywords)
+- Pin your favorite apps with a right click (appears first in app grid)
 - Web search fallback when no apps match (Enter or click the row)
 - URL loading in browser if the input looks like a URL
 - Executes basic arithmetic in the search bar & copies results to clipboard
