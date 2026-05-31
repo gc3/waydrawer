@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 from typing import List, Optional
 from gi.repository import Gio
 
@@ -59,7 +59,10 @@ class AppInfo:
   # --- serialization ---
   @classmethod
   def from_dict(cls, d: dict) -> "AppInfo":
-    return cls(**d)
+    # ignore unknown keys so a schema-drifted cache entry degrades gracefully
+    # instead of raising TypeError; missing required keys still raise (caught).
+    known = {f.name for f in fields(cls)}
+    return cls(**{k: v for k, v in d.items() if k in known})
 
   def to_dict(self) -> dict:
     return asdict(self)

@@ -22,14 +22,6 @@ CACHE_VERSION = 3  # bump if you change the schema
 
 
 # ----------- Internal Helpers ----------------------------------------------------
-def _app_dirs():
-  """
-    Gather all the directories containing .desktop files
-  """
-  dirs = [Path(d) / "applications" for d in GLib.get_system_data_dirs()]
-  dirs.append(Path(GLib.get_user_data_dir()) / "applications")
-  return [d for d in dirs if d.is_dir()]
-
 def _serialize(info):
   """
     Given a Gio.AppInfo, return one of our app wrappers. We use this as a layer
@@ -70,6 +62,41 @@ def _categorize(apps):
   # JSON has no tuples — store as list of [cat, apps] pairs
   return [[cat, buckets[cat]] for cat in CATEGORY_ORDER if buckets[cat]]
 
+def _app_dirs():
+  """
+    Directories containing .desktop files: the XDG data dirs plus the flatpak
+    export dirs explicitly, in case the latter aren't in XDG_DATA_DIRS (e.g.
+    launched outside a full login session). Deduped, real dirs only.
+  """
+  user_data = Path(GLib.get_user_data_dir())
+  dirs = [Path(d) / "applications" for d in GLib.get_system_data_dirs()]
+  dirs.append(user_data / "applications")
+  dirs.append(user_data / "flatpak/exports/share/applications")
+  dirs.append(Path("/var/lib/flatpak/exports/share/applications"))
+
+  seen, out = set(), []
+  for d in dirs:
+    if d not in seen and d.is_dir():
+      seen.add(d)
+      out.append(d)
+  return out
+
+def _max_mtime():
+  """
+    Newest mtime across the app dirs *and* the .desktop files in them. Dir
+    mtimes catch adds/removals (the entry list changes); file mtimes catch
+    in-place content edits, which do NOT bump the dir mtime. We need both.
+  """
+  dirs = _app_dirs()
+  m = max((d.stat().st_mtime for d in dirs), default=0.0)
+  for d in dirs:
+    for file in d.glob("*.desktop"):
+      try:
+        m = max(m, file.stat().st_mtime)
+      except OSError:
+        pass
+
+  return m
 
 # ----------- API -------------------------------------------------------------
 def load_apps():
@@ -77,9 +104,7 @@ def load_apps():
     Returns dict of {category => [AppInfo, ...]} where categories point to a list of
     apps in that category. Apps are sorted alphabetically.
   """
-
-  # Max mtime across XDG application dirs. One stat per dir.
-  mtime = max((d.stat().st_mtime for d in _app_dirs()), default=0)
+  mtime = _max_mtime()
   if APPS_CACHE.exists():
     try:
       cached = json.loads(APPS_CACHE.read_text())
@@ -92,7 +117,7 @@ def load_apps():
           result.append([cat, rehydrated])
         return result
 
-    except (OSError, ValueError, KeyError) as e:
+    except (OSError, ValueError, KeyError, TypeError) as e:
       print(f"[waydrawer] cache read error: {e}", file=sys.stderr)
 
   # * MISS *
