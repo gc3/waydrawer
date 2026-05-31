@@ -72,8 +72,8 @@ def _launch_app_and_exit(ai: GioUnix.DesktopAppInfo, drawer: "Drawer") -> None:
   except OSError as e:
     print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
 
-  # exit the app after loading an external program
-  drawer.get_application().quit()
+  # 'exit' the app after loading an external program
+  drawer.get_application().dismiss()
 
 
 def _open_url(url: str) -> None:
@@ -316,7 +316,7 @@ class Drawer(Gtk.ApplicationWindow):
   # ----- action handlers -----
   def _on_key_pressed(self, _kc, keyval, _kc2, _state):
     if keyval == Gdk.KEY_Escape:
-      self.get_application().quit()
+      self.get_application().dismiss()
       return True
 
     return False
@@ -388,7 +388,7 @@ class Drawer(Gtk.ApplicationWindow):
     else:
       _web_search(text)
 
-    self.get_application().quit()
+    self.get_application().dismiss()
 
   def _on_search_activate(self, entry: Gtk.SearchEntry):
     """ Handler for hitting enter in the search bar """
