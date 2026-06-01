@@ -7,6 +7,7 @@
   - fall back to websearch
   - open a website
   - pin favorite apps
+  - optional daemon mode for fast start up times
 - inspired by the gnome app drawer that I couldn't find anywhere else
 - tested on hyprland
 
@@ -19,6 +20,7 @@
 - URL loading in browser if the input looks like a URL
 - Executes basic arithmetic in the search bar & copies results to clipboard
 - Layer-shell overlay; Esc to close, Enter to launch first visible match
+- Daemon mode using sockets that allows the client to open nearly instantly
 
 ## Dependencies
 Python:
@@ -48,10 +50,23 @@ hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
 ```
 
 ## Configuration
-Examples are 
+Examples are
 - config/config.toml
 - config/style.css
 
 Your files live at
 - ~/.config/waydrawer/config.toml
 - ~/.config/waydrawer/style.css
+
+## Running waydrawer
+<pre>
+%% waydrawer -h
+usage: waydrawer [-h] [-d | -q]
+
+GTK4 app drawer for Wayland.
+
+options:
+  -h, --help    show this help message and exit
+  -d, --daemon  run as a daemon: build the drawer once, show/hide on request
+  -q, --quit    tell a running daemon to exit
+</pre>
