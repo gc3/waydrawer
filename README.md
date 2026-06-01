@@ -21,6 +21,8 @@
 - Executes basic arithmetic in the search bar & copies results to clipboard
 - Layer-shell overlay; Esc to close, Enter to launch first visible match
 - Daemon mode using sockets that allows the client to open nearly instantly
+- CSS styling of GTK components (with examples!)
+- Config file for basic customization (like search fallback URL)
 
 ## Dependencies
 Python:
