@@ -13,6 +13,9 @@ import os
 import sys
 import socket
 import argparse
+import setproctitle
+
+setproctitle.setproctitle("waydrawer")
 
 _RUNTIME = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
 SOCK_PATH = f"{_RUNTIME}/waydrawer.sock"
