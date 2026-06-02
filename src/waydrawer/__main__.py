@@ -118,6 +118,11 @@ def _build_parser() -> argparse.ArgumentParser:
     action="store_true",
     help="tell a running daemon to exit"
   )
+  group.add_argument(
+    "-t", "--toggle",
+    action="store_true",
+    help="toggle the waydrawer ui"
+  )
 
   return parser
 
@@ -132,8 +137,8 @@ def main() -> int:
     return 0
 
   # let me see if you can run it, run it
-  if not args.daemon and _send(b"show\n"):
-    return 0
+  if not args.daemon:
+    return _send(b"toggle\n") if args.toggle else _send(b"show\n")
 
   # indeed i can run it, run it
   return _run_gtk(args.daemon)
