@@ -17,7 +17,6 @@ install: build
 lint:
 	mkdir -p build
 	pylint --output build/lint.log src/waydrawer
-	cat build/lint.log
 
 clean:
 	rm -rf dist build __pycache__ src/waydrawer/__pycache__

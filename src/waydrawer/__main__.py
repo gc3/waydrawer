@@ -138,7 +138,11 @@ def main() -> int:
 
   # let me see if you can run it, run it
   if not args.daemon:
-    return _send(b"toggle\n") if args.toggle else _send(b"show\n")
+    if args.toggle and _send(b"toggle\n"):
+      return 0
+
+    if _send(b"show\n"):
+      return 0
 
   # indeed i can run it, run it
   return _run_gtk(args.daemon)

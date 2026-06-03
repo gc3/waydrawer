@@ -103,7 +103,9 @@ def _looks_like_url(s: str) -> bool:
 
 # ----------- Widgets ----------------------------------------------------------
 class AppTile(Gtk.Button):
-  """ A single app grid entry that launches an app on click """
+  """
+    A single app grid entry that launches an app on click
+  """
 
   def __init__(self, app_info: GioUnix.DesktopAppInfo, drawer: "Drawer"):
     super().__init__()
@@ -152,7 +154,9 @@ class AppTile(Gtk.Button):
     self.drawer.fav_row.toggle_app(self.app_info.get_id())
 
 class FavoritesRow(Gtk.Box):
-  """Self-contained favorites section: header + tile grid + the pinned-id list."""
+  """
+    Self-contained favorites section: header + tile grid + the pinned-id list.
+  """
 
   def __init__(self, drawer: "Drawer", apps_by_id: dict):
     super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=20)
@@ -178,9 +182,10 @@ class FavoritesRow(Gtk.Box):
 
     self.rebuild()
 
-
   def rebuild(self):
-    """Clear and repopulate tiles from the current id list."""
+    """
+      Clear and repopulate tiles from the current id list.
+    """
     child = self._fav_flow.get_first_child()
     while child is not None:
       nxt = child.get_next_sibling()
@@ -192,9 +197,10 @@ class FavoritesRow(Gtk.Box):
       if (ai := self._all_apps_by_id.get(app_id)):
         self._fav_flow.append(AppTile(ai, self._drawer))
 
-
   def toggle_app(self, app_id: str):
-    """Pin/unpin an app, then persist and refresh."""
+    """
+      Pin/unpin an app, then persist and refresh.
+    """
     if app_id in self._fav_apps_by_id:
       self._fav_apps_by_id.remove(app_id)
 
@@ -205,19 +211,103 @@ class FavoritesRow(Gtk.Box):
     self.rebuild()
 
   def hide_favorites(self, is_searching: bool):
-    """ Hide the whole row while a search is in progress."""
+    """
+      Hide the whole row while a search is in progress.
+    """
     self.set_visible(not is_searching and bool(self._fav_apps_by_id))
 
 
 class Drawer(Gtk.ApplicationWindow):
-  """ The app grid + launcher that makes up the 'drawer' """
+  """
+    The app grid + launcher that makes up the 'drawer'
+  """
 
   def __init__(self, app: Gtk.Application):
     super().__init__(application=app, title=config.APP_NAME)
 
-    # Overlay:
-    #   setup the this app as a full screen overlay with a margin so
-    #   it's centered with breathing room
+    # Overlay: * keep at top *
+    #   this app presents as a full screen overlay
+    self._setup_overlay()
+
+    # Data:
+    #   load in all the app data from the .desktop files
+    self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
+    self._apps_by_category = dict(cache.load_apps())
+    all_apps_by_id = {}
+    for apps in self._apps_by_category.values():
+      for a in apps:
+        all_apps_by_id[a.id] = a
+
+    # Component construction:
+    #   - search bar
+    #   - app grid
+    #   - (optional) fall back bar
+    self._root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    self._root.set_margin_top(24)
+    self._root.set_margin_bottom(24)
+    self._root.set_margin_start(28)
+    self._root.set_margin_end(28)
+
+    self._root.set_hexpand(True)
+    self._root.set_vexpand(True)
+
+    #   search bar is on top
+    self.search = Gtk.SearchEntry()
+    self.search.set_placeholder_text("Search apps, type a URL, or query the web…")
+    self.search.connect("search-changed", self._on_search_changed)
+    self.search.connect("activate", self._on_search_activate)
+    self._root.append(self.search)
+
+    #   app grid is in the middle
+    #     - first favorites row
+    #     - second all the apps we know about, by category
+    grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+    self.fav_row = FavoritesRow(self, all_apps_by_id)
+    grid_box.append(self.fav_row)
+    self._setup_app_grid(grid_box)
+
+    #   optional bottom row for info if we're not selecting an app
+    self.web_row = Gtk.Button()
+    self.web_row.add_css_class("web-fallback")
+    self.web_row.set_visible(False)
+    self.web_row.connect("clicked", self._on_web_clicked)
+    self._root.append(self.web_row)
+
+    #   finally make the app grid scrollable
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_vexpand(True)
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_child(grid_box)
+    self._root.append(scroller)
+
+    # Fullscreen Surface / Backdrop:
+    #   the panel sits inside a backdrop box we own, so clicks *around* the
+    #   panel land on a widget we can use to dismiss.
+    backdrop = Gtk.Box()
+    backdrop.add_css_class("backdrop")   # CSS supplies the inset + optional dim
+    backdrop.append(self._root)
+    self.set_child(backdrop)
+
+    # Action Handlers:
+    #   - clicks on the backdrop
+    #   - typing in the search bar
+    click = Gtk.GestureClick()
+    click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+    click.connect("pressed", self._on_backdrop_clicked)
+    self.add_controller(click)
+
+    ck = Gtk.EventControllerKey()
+    ck.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+    ck.connect("key-pressed", self._on_key_pressed)
+    self.add_controller(ck)
+
+
+  # ----- component construction helpers -----
+  def _setup_overlay(self):
+    """
+      setup the this app as a full screen overlay with a margin so it's
+      centered with breathing room
+    """
     LayerShell.init_for_window(self)
     LayerShell.set_namespace(self, config.APP_NAME)
     LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
@@ -233,64 +323,10 @@ class Drawer(Gtk.ApplicationWindow):
     LayerShell.set_margin(self, LayerShell.Edge.LEFT, 200)
     LayerShell.set_margin(self, LayerShell.Edge.RIGHT, 200)
 
-    # Data:
-    #   load in all the app data from the .desktop files
-    self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
-    self._apps_by_category = dict(cache.load_apps())
-    all_apps_by_id = {}
-    for apps in self._apps_by_category.values():
-      for a in apps:
-        all_apps_by_id[a.id] = a
-
-    # Component construction:
-    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-    root.set_margin_top(24)
-    root.set_margin_bottom(24)
-    root.set_margin_start(28)
-    root.set_margin_end(28)
-
-    #   search bar is on top
-    self.search = Gtk.SearchEntry()
-    self.search.set_placeholder_text("Search apps, type a URL, or query the web…")
-    self.search.connect("search-changed", self._on_search_changed)
-    self.search.connect("activate", self._on_search_activate)
-    root.append(self.search)
-
-    #   row for info if we're not selecting an app
-    self.web_row = Gtk.Button()
-    self.web_row.add_css_class("web-fallback")
-    self.web_row.set_visible(False)
-    self.web_row.connect("clicked", self._on_web_clicked)
-    root.append(self.web_row)
-
-    #   app grid is on bottom
-    grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-
-    #     first favorites row
-    self.fav_row = FavoritesRow(self, all_apps_by_id)
-    grid_box.append(self.fav_row)
-
-    #     second all the apps we know about, by category
-    self._build_app_grid(grid_box)
-
-    # finally make the app grid scrollable
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_vexpand(True)
-    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_child(grid_box)
-    root.append(scroller)
-    self.set_child(root)
-
-    # send key presses to the window from the input
-    kc = Gtk.EventControllerKey()
-    kc.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-    kc.connect("key-pressed", self._on_key_pressed)
-    self.add_controller(kc)
-
-
-  def _build_app_grid(self, grid_box):
-    """Populate grid_box with one labeled FlowBox per non-empty category."""
-
+  def _setup_app_grid(self, grid_box):
+    """
+      Populate grid_box with one labeled FlowBox per non-empty category.
+    """
     for cat in config.CATEGORY_ORDER:
       apps = self._apps_by_category.get(cat, [])
       if not apps:
@@ -313,7 +349,19 @@ class Drawer(Gtk.ApplicationWindow):
       grid_box.append(flow)
       self._categories.append((cat, header, flow))
 
+
   # ----- action handlers -----
+  def _on_backdrop_clicked(self, _gesture, _n_press, x, y):
+    # did the click land in the drawer area? do nothing
+    target = self.pick(x, y, Gtk.PickFlags.DEFAULT) # pylint: disable=no-member
+    while target is not None:
+      if target is self._root:
+        return
+      target = target.get_parent()
+
+    # if it's outside the drawer? close ourselves
+    self.get_application().dismiss()
+
   def _on_key_pressed(self, _kc, keyval, _kc2, _state):
     if keyval == Gdk.KEY_Escape:
       self.get_application().dismiss()
@@ -325,8 +373,7 @@ class Drawer(Gtk.ApplicationWindow):
     q = entry.get_text().strip().lower()
 
     # Hide favorites row when searching
-    is_searching = bool(q)
-    self.fav_row.hide_favorites(is_searching)
+    self.fav_row.hide_favorites(bool(q))
 
     if not q:
       for _, header, flow in self._categories:
@@ -356,8 +403,7 @@ class Drawer(Gtk.ApplicationWindow):
 
     else:
       raw = entry.get_text().strip()
-      result = math.try_math(raw)
-      if result is not None:
+      if result := math.try_math(raw) is not None:
         self.web_row.set_label(f"  Math result is {result}")
 
       elif _looks_like_url(raw):
@@ -368,8 +414,41 @@ class Drawer(Gtk.ApplicationWindow):
 
       self.web_row.set_visible(True)
 
+  def _on_search_activate(self, entry: Gtk.SearchEntry):
+    """
+      Handler for hitting enter in the search bar
+    """
+    raw = entry.get_text().strip()
+    if not raw:
+      return
+
+    # we first check for an app match and launch it
+    query = raw.lower()
+    for cat, _h, _flow in self._categories:
+      for app_info in self._apps_by_category.get(cat, []):
+        if _matches(app_info, query):
+          _launch_app_and_exit(app_info, self)
+          return
+
+    # then we check the other features
+    self._handle_non_apps(raw)
+
+  def _on_web_clicked(self, _btn):
+    """
+      Handler for clicking the button at the bottom of the results
+    """
+    raw = self.search.get_text().strip()
+    if not raw:
+      return
+
+    # there's no button when we pick an app, so only have to handle the
+    # other features on a button click
+    self._handle_non_apps(raw)
+
   def _handle_non_apps(self, text):
-    """ handle the execution of non-app search features """
+    """
+      handle the execution of non-app search features
+    """
     if (result := math.try_math(text)) is not None:
       out = str(result)
       if shutil.which("wl-copy"):
@@ -389,30 +468,3 @@ class Drawer(Gtk.ApplicationWindow):
       _web_search(text)
 
     self.get_application().dismiss()
-
-  def _on_search_activate(self, entry: Gtk.SearchEntry):
-    """ Handler for hitting enter in the search bar """
-    raw = entry.get_text().strip()
-    if not raw:
-      return
-
-    # we first check for an app match and launch it
-    query = raw.lower()
-    for cat, _h, _flow in self._categories:
-      for app_info in self._apps_by_category.get(cat, []):
-        if _matches(app_info, query):
-          _launch_app_and_exit(app_info, self)
-          return
-
-    # then we check the other features
-    self._handle_non_apps(raw)
-
-  def _on_web_clicked(self, _btn):
-    """ Handler for clicking the button at the bottom of the results """
-    raw = self.search.get_text().strip()
-    if not raw:
-      return
-
-    # there's no button when we pick an app, so only have to handle the
-    # other features on a button click
-    self._handle_non_apps(raw)
