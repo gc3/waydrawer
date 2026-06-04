@@ -88,8 +88,8 @@ def _run_gtk(daemon_mode: bool) -> int:
     print("[waydrawer] already running. Exiting...", file=sys.stderr)
     return 0
 
-  #if daemon_mode:
-    #_daemonize()
+  if daemon_mode:
+    _daemonize()
 
   # We make the app to pre-load the ui for the future callers. We pass None when
   # running since we parsed and all the args in main().

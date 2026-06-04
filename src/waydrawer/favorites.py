@@ -9,7 +9,7 @@ from waydrawer.config import CONFIG_DIR
 
 FAVORITES_FILE = CONFIG_DIR / "favorites.json"
 
-def load_favorites() -> list[str]:
+def load() -> list[str]:
   """ Load favorites from the config directory """
   try:
     return json.loads(FAVORITES_FILE.read_text())
@@ -17,7 +17,7 @@ def load_favorites() -> list[str]:
   except (FileNotFoundError, json.JSONDecodeError):
     return []
 
-def save_favorites(ids: list[str]) -> None:
+def save(ids: list[str]) -> None:
   """ Write out favorites to the config directory """
   CONFIG_DIR.mkdir(parents=True, exist_ok=True)
   FAVORITES_FILE.write_text(json.dumps(ids, indent=2))

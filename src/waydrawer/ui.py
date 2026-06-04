@@ -6,104 +6,25 @@
 """
 from __future__ import annotations
 
-import re
-import sys
 import shutil
 import subprocess
-from urllib.parse import quote_plus
 
 # pylint: disable=wrong-import-position
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
 gi.require_version("GioUnix", "2.0")
-from gi.repository import GioUnix, Gtk, GLib, Gdk, Gtk4LayerShell as LayerShell
+from gi.repository import GioUnix, Gtk, Gdk, Gtk4LayerShell as LayerShell
 
 from waydrawer import cache
 from waydrawer import config
 from waydrawer import favorites
 from waydrawer import math
-
-# load the user's config.toml
-CFG = config.config_load()
-
-
-# ----------- Helper Functions -------------------------------------------------
-# XXX gc3: move these helpers to their own file and make the big comment
-#          dividers by type of widet (drawer, tiles, etc)
-def _matches(app_info: GioUnix.DesktopAppInfo, q: str) -> bool:
-  if not q:
-    return True
-
-  name = (app_info.get_display_name() or "").lower()
-  generic = (app_info.get_generic_name() or "").lower()
-  keywords = " ".join(app_info.get_keywords() or []).lower()
-  return q in name or q in generic or q in keywords
-
-def _launch_app_and_exit(ai: GioUnix.DesktopAppInfo, drawer: "Drawer") -> None:
-
-  cmdline = ai.get_commandline()
-  if not cmdline:
-    # DBusActivatable or no Exec= — fall back to GIO
-    try:
-      ai.launch([], None)
-
-    except GLib.Error as e:
-      print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
-    return
-
-  try:
-    _ok, argv = GLib.shell_parse_argv(cmdline)
-
-  except GLib.Error as e:
-    print(f"[waydrawer] failed to parse Exec=: {e}", file=sys.stderr)
-    return
-
-  # Strip .desktop field codes (%f %F %u %U %i %c %k ...)
-  argv = [a for a in argv if not (len(a) == 2 and a.startswith("%"))]
-  try:
-    subprocess.Popen(  # pylint: disable=consider-using-with
-      argv,
-      stdin=subprocess.DEVNULL,
-      stdout=subprocess.DEVNULL,
-      stderr=subprocess.DEVNULL,
-      start_new_session=True,
-      close_fds=True,
-    )
-
-  except OSError as e:
-    print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
-
-  # 'exit' the app after loading an external program
-  drawer.get_application().dismiss()
+from waydrawer import shortcuts
+from waydrawer import util
 
 
-def _open_url(url: str) -> None:
-  if not url.startswith(("http://", "https://", "file://")):
-    url = "https://" + url
-
-  subprocess.Popen(   # pylint: disable=consider-using-with
-    ["xdg-open", url],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-    start_new_session=True,
-  )
-
-def _web_search(query: str) -> None:
-  _open_url(CFG["search_url"].format(quote_plus(query)))
-
-def _looks_like_url(s: str) -> bool:
-  s = s.strip()
-  if not s or " " in s:
-    return False
-
-  if s.startswith(("http://", "https://", "file://")):
-    return True
-
-  return bool(re.match(r"^[\w.-]+\.[a-z]{2,}(/.*)?$", s, re.IGNORECASE))
-
-
-# ----------- Widgets ----------------------------------------------------------
+# ----------- Tiles (grid entries) --------------------------------------------
 class AppTile(Gtk.Button):
   """
     A single app grid entry that launches an app on click
@@ -127,7 +48,7 @@ class AppTile(Gtk.Button):
     else:
       icon.set_from_icon_name("application-x-executable")
 
-    icon.set_pixel_size(CFG["icon_size"])
+    icon.set_pixel_size(util.CFG["icon_size"])
     box.append(icon)
 
     label = Gtk.Label(label=app_info.get_display_name() or "?")
@@ -139,7 +60,7 @@ class AppTile(Gtk.Button):
     box.append(label)
 
     self.set_child(box)
-    self.connect("clicked", lambda _b: _launch_app_and_exit(app_info, drawer))
+    self.connect("clicked", lambda _b: drawer.launch_app_and_exit(app_info))
 
     # Right-click menu
     right_click = Gtk.GestureClick()
@@ -155,6 +76,8 @@ class AppTile(Gtk.Button):
     """
     self.drawer.fav_row.toggle_app(self.app_info.get_id())
 
+
+# ----------- Rows (drawer sections) ------------------------------------------
 class FavoritesRow(Gtk.Box):
   """
     Self-contained favorites section: header + tile grid + the pinned-id list.
@@ -166,7 +89,7 @@ class FavoritesRow(Gtk.Box):
     self._drawer = drawer
     self._all_apps_by_id = apps_by_id
     self._fav_apps_by_id : list[str] = [
-      i for i in favorites.load_favorites() if i in apps_by_id
+      i for i in favorites.load() if i in apps_by_id
     ]
 
     self._fav_header = Gtk.Label(label="Favorites", xalign=0)
@@ -174,7 +97,7 @@ class FavoritesRow(Gtk.Box):
     self.append(self._fav_header)
 
     self._fav_flow = Gtk.FlowBox()
-    self._fav_flow.set_max_children_per_line(CFG["columns"])
+    self._fav_flow.set_max_children_per_line(util.CFG["columns"])
     self._fav_flow.set_min_children_per_line(1)
     self._fav_flow.set_homogeneous(True)
     self._fav_flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -209,7 +132,7 @@ class FavoritesRow(Gtk.Box):
     else:
       self._fav_apps_by_id.append(app_id)
 
-    favorites.save_favorites(self._fav_apps_by_id)
+    favorites.save(self._fav_apps_by_id)
     self.rebuild()
 
   def hide_favorites(self, is_searching: bool):
@@ -219,6 +142,8 @@ class FavoritesRow(Gtk.Box):
     self.set_visible(not is_searching and bool(self._fav_apps_by_id))
 
 
+# ----------- Drawer (main app window) ----------------------------------------
+# pylint: disable=too-many-instance-attributes
 class Drawer(Gtk.ApplicationWindow):
   """
     The app grid + launcher that makes up the 'drawer'
@@ -239,6 +164,8 @@ class Drawer(Gtk.ApplicationWindow):
     for apps in self._apps_by_category.values():
       for a in apps:
         all_apps_by_id[a.id] = a
+
+    self._shortcuts = shortcuts.load()
 
     # Component construction:
     #   - search bar
@@ -262,10 +189,12 @@ class Drawer(Gtk.ApplicationWindow):
 
     #   app grid is in the middle
     #     - first favorites row
-    #     - second all the apps we know about, by category
+    #     - then all the apps we know about, by category
     grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+
     self.fav_row = FavoritesRow(self, all_apps_by_id)
     grid_box.append(self.fav_row)
+
     self._setup_app_grid(grid_box)
 
     #   optional bottom row for info if we're not selecting an app
@@ -310,6 +239,14 @@ class Drawer(Gtk.ApplicationWindow):
     vadj = self._scroller.get_vadjustment()
     vadj.set_value(vadj.get_lower())
 
+  def launch_app_and_exit(self, app_info: GioUnix.DesktopAppInfo):
+    """
+      'exit' the app after launching an external process
+    """
+    util.launch_app(app_info)
+    self.get_application().dismiss()
+
+
   # ----- component construction helpers -----
   def _setup_overlay(self):
     """
@@ -345,7 +282,7 @@ class Drawer(Gtk.ApplicationWindow):
       grid_box.append(header)
 
       flow = Gtk.FlowBox()
-      flow.set_max_children_per_line(CFG["columns"])
+      flow.set_max_children_per_line(util.CFG["columns"])
       flow.set_min_children_per_line(1)
       flow.set_homogeneous(True)
       flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -395,26 +332,33 @@ class Drawer(Gtk.ApplicationWindow):
     any_visible = False
     for cat, header, flow in self._categories:
       apps = self._apps_by_category.get(cat, [])
-      has_match = any(_matches(a, q) for a in apps)
+      has_match = any(util.matches(a, q) for a in apps)
       header.set_visible(has_match)
       flow.set_visible(has_match)
 
       if has_match:
         any_visible = True
         flow.set_filter_func(
-          lambda child, qq=q: _matches(child.get_child().app_info, qq)
+          lambda child, qq=q: util.matches(child.get_child().app_info, qq)
         )
         flow.invalidate_filter()
+
+    # a matching shortcut owns the suggestion bar (this is the typeahead)
+    raw = entry.get_text().strip()
+    if (sc := shortcuts.match(self._shortcuts, raw, exact=False)):
+      self.web_row.set_label(f"  Open  {sc[0]}")
+      self.web_row.set_visible(True)
+      return
 
     if any_visible:
       self.web_row.set_visible(False)
 
     else:
       raw = entry.get_text().strip()
-      if result := math.try_math(raw) is not None:
+      if (result := math.try_math(raw)) is not None:
         self.web_row.set_label(f"  Math result is {result}")
 
-      elif _looks_like_url(raw):
+      elif util.looks_like_url(raw):
         self.web_row.set_label(f"  Open  {raw}")
 
       else:
@@ -430,12 +374,17 @@ class Drawer(Gtk.ApplicationWindow):
     if not raw:
       return
 
+    # an exact shortcut name runs immediately, ahead of any app match
+    if (sc := shortcuts.match(self._shortcuts, raw, exact=True)):
+      shortcuts.launch(sc[1], self)
+      return
+
     # we first check for an app match and launch it
     query = raw.lower()
     for cat, _h, _flow in self._categories:
       for app_info in self._apps_by_category.get(cat, []):
-        if _matches(app_info, query):
-          _launch_app_and_exit(app_info, self)
+        if util.matches(app_info, query):
+          self.launch_app_and_exit(app_info)
           return
 
     # then we check the other features
@@ -457,6 +406,10 @@ class Drawer(Gtk.ApplicationWindow):
     """
       handle the execution of non-app search features
     """
+    if (sc := shortcuts.match(self._shortcuts, text, exact=False)):
+      shortcuts.launch(sc[1], self)
+      return
+
     if (result := math.try_math(text)) is not None:
       out = str(result)
       if shutil.which("wl-copy"):
@@ -469,10 +422,10 @@ class Drawer(Gtk.ApplicationWindow):
 
       self.web_row.set_label("  Math result is copied to clipboard!")
 
-    elif _looks_like_url(text):
-      _open_url(text)
+    elif util.looks_like_url(text):
+      util.open_url(text)
 
     else:
-      _web_search(text)
+      util.web_search(text)
 
     self.get_application().dismiss()

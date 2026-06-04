@@ -45,7 +45,6 @@ CATEGORY_ORDER = [
   "Games", "Utilities", "System", "Education", "Science", "Other",
 ]
 
-
 def config_load():
   """ read the user's config file or give them the default values """
   cfg = dict(CFG_DEFAULTS)
@@ -67,3 +66,6 @@ def config_load():
       print(f"[waydrawer] config error: {e}, using defaults", file=sys.stderr)
 
   return cfg
+
+# load the user's config.toml for others to use
+CFG = config_load()
