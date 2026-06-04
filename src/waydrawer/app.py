@@ -47,6 +47,7 @@ class WayDrawerApp(Gtk.Application):
     self._window.search.set_text("") # fresh search each show (resets the view)
     self._window.set_visible(True)
     self._window.present()
+    GLib.idle_add(lambda: (self._window.reset_scroll(), False)[1])
     GLib.idle_add(lambda: (self._window.search.grab_focus(), False)[1])
 
   def dismiss(self):

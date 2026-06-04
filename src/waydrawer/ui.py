@@ -29,6 +29,8 @@ CFG = config.config_load()
 
 
 # ----------- Helper Functions -------------------------------------------------
+# XXX gc3: move these helpers to their own file and make the big comment
+#          dividers by type of widet (drawer, tiles, etc)
 def _matches(app_info: GioUnix.DesktopAppInfo, q: str) -> bool:
   if not q:
     return True
@@ -274,11 +276,11 @@ class Drawer(Gtk.ApplicationWindow):
     self._root.append(self.web_row)
 
     #   finally make the app grid scrollable
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_vexpand(True)
-    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_child(grid_box)
-    self._root.append(scroller)
+    self._scroller = Gtk.ScrolledWindow()
+    self._scroller.set_vexpand(True)
+    self._scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    self._scroller.set_child(grid_box)
+    self._root.append(self._scroller)
 
     # Fullscreen Surface / Backdrop:
     #   the panel sits inside a backdrop box we own, so clicks *around* the
@@ -301,6 +303,12 @@ class Drawer(Gtk.ApplicationWindow):
     ck.connect("key-pressed", self._on_key_pressed)
     self.add_controller(ck)
 
+  def reset_scroll(self):
+    """
+      reset the scroll position of the window back to the start
+    """
+    vadj = self._scroller.get_vadjustment()
+    vadj.set_value(vadj.get_lower())
 
   # ----- component construction helpers -----
   def _setup_overlay(self):
