@@ -5,12 +5,12 @@
 
   e.g.:
   {
-    "Router": "http://192.168.1.1",
-    "Downloads": "/home/gc3/Downloads",
-    "Calendar": "https://app.fastmail.com/calendar"
+    "notes": "/home/gc3/Documents/notes.md",
+    "downloads": "/home/gc3/Downloads",
+    "docs": "/home/gc3/Documents"
   }
 
-  XXX gc3: TODO -- there is no in-app editor, the file is the source of truth.
+  XXX: there is no in-app editor, the file is the source of truth.
 """
 from __future__ import annotations
 

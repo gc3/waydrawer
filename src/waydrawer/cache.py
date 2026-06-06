@@ -79,6 +79,7 @@ def _app_dirs():
     if d not in seen and d.is_dir():
       seen.add(d)
       out.append(d)
+
   return out
 
 def _max_mtime():

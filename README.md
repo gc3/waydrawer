@@ -7,6 +7,7 @@
   - fall back to websearch
   - open a website
   - pin favorite apps
+  - save 'shortcuts' that get passed to xdg-open
   - optional daemon mode for fast start up times
 - inspired by the gnome app drawer that I couldn't find anywhere else
 - tested on hyprland
@@ -55,15 +56,17 @@ hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
 Examples are
 - config/config.toml
 - config/style.css
+- config/shortcuts.json
 
 Your files live at
 - ~/.config/waydrawer/config.toml
 - ~/.config/waydrawer/style.css
+- ~/.config/waydrawer/...
 
 ## Running waydrawer
 <pre>
 %% waydrawer -h
-usage: waydrawer [-h] [-d | -q]
+usage: waydrawer [-h] [-d | -q | -t]
 
 GTK4 app drawer for Wayland.
 
@@ -71,4 +74,5 @@ options:
   -h, --help    show this help message and exit
   -d, --daemon  run as a daemon: build the drawer once, show/hide on request
   -q, --quit    tell a running daemon to exit
+  -t, --toggle  toggle the waydrawer ui
 </pre>

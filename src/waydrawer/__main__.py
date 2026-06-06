@@ -6,7 +6,6 @@
   daemon costs an interpreter start + a socket write, not a full gi load.
 """
 # pylint: disable=import-outside-toplevel
-# pylint: disable=consider-using-with
 from __future__ import annotations
 
 import os
@@ -39,7 +38,6 @@ def _send(cmd: bytes) -> bool:
   finally:
     s.close()
 
-
 def _ensure_preload():
   """
     Re-exec once with LD_PRELOAD set (guarded so it only fires on the first pass).
@@ -52,7 +50,6 @@ def _ensure_preload():
     os.environ["LD_PRELOAD"] = preload
     os.environ["PYTHONPATH"] = ":".join(sys.path)
     os.execv(sys.executable, [sys.executable] + sys.argv)
-
 
 def _daemonize():
   """
@@ -69,7 +66,6 @@ def _daemonize():
   for fd in (0, 1, 2):
     os.dup2(devnull, fd)
 
-
 def _run_gtk(daemon_mode: bool) -> int:
   """
     Run the waydrawer ui and do so in daemon mode if necessary. Note: We do some
@@ -80,7 +76,7 @@ def _run_gtk(daemon_mode: bool) -> int:
   _ensure_preload() # required bugfix
 
   # single-instance guard — the daemon (or a one-shot run) holds this lock.
-  lock_fd = open(LOCK_PATH, "wb")
+  lock_fd = open(LOCK_PATH, "wb") # pylint: disable=consider-using-with
   try:
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 

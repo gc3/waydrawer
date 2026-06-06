@@ -232,19 +232,28 @@ class Drawer(Gtk.ApplicationWindow):
     ck.connect("key-pressed", self._on_key_pressed)
     self.add_controller(ck)
 
-  def reset_scroll(self):
-    """
-      reset the scroll position of the window back to the start
-    """
-    vadj = self._scroller.get_vadjustment()
-    vadj.set_value(vadj.get_lower())
-
   def launch_app_and_exit(self, app_info: GioUnix.DesktopAppInfo):
     """
       'exit' the app after launching an external process
     """
     util.launch_app(app_info)
     self.get_application().dismiss()
+
+  def reset_for_show(self):
+    """
+      reset the various bits of ui and state when this window is shown,
+      typically from the daemon
+    """
+
+    # reset the scroll position of the window back to the start
+    vadj = self._scroller.get_vadjustment()
+    vadj.set_value(vadj.get_lower())
+
+    # make sure the user input has focus
+    self.search.grab_focus()
+
+    # reload the shortcuts if they've changed
+    self._shortcuts = shortcuts.load()
 
 
   # ----- component construction helpers -----
