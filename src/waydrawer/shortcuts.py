@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import json
-from waydrawer import util
 from waydrawer.config import CONFIG_DIR
 
 SHORTCUTS_FILE = CONFIG_DIR / "shortcuts.json"
@@ -57,10 +56,3 @@ def match(scs: dict[str, str], q: str, exact: bool) -> tuple[str, str] | None:
       prefix = (name, target)
 
   return prefix
-
-def launch(target: str, drawer: "Drawer") -> None:
-  """
-    Opening up a shortcut is just sending it to xdg-open
-  """
-  util.spawn_detached(["xdg-open", target])
-  drawer.get_application().dismiss()

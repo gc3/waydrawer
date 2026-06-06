@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 # pylint: disable=wrong-import-position
 import gi
 gi.require_version("GioUnix", "2.0")
-from gi.repository import GioUnix, GLib
+from gi.repository import Gio, GioUnix, GLib
 
 from waydrawer.config import CFG
 
@@ -73,6 +73,22 @@ def launch_app(ai: GioUnix.DesktopAppInfo) -> None:
 
   except OSError as e:
     print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+
+def open_target(target: str) -> None:
+  """
+    Used primarily for shortcuts, this opens target with the user's registered
+    default handler.
+
+    Prefer the in-process GLib path: no external binary, and it honors
+    Terminal=true so terminal apps (vim, …) get a real terminal. Fall back to
+    xdg-open only when GLib has no default registered for the target.
+  """
+  try:
+    uri = Gio.File.new_for_commandline_arg(target).get_uri()
+    Gio.AppInfo.launch_default_for_uri(uri, None)
+
+  except GLib.Error:
+    spawn_detached(["xdg-open", target])
 
 def web_search(query: str) -> None:
   """

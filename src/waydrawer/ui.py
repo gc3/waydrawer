@@ -60,7 +60,7 @@ class AppTile(Gtk.Button):
     box.append(label)
 
     self.set_child(box)
-    self.connect("clicked", lambda _b: drawer.launch_app_and_exit(app_info))
+    self.connect("clicked", lambda _b: drawer.launch_app_and_hide(app_info))
 
     # Right-click menu
     right_click = Gtk.GestureClick()
@@ -165,7 +165,7 @@ class Drawer(Gtk.ApplicationWindow):
       for a in apps:
         all_apps_by_id[a.id] = a
 
-    self._shortcuts = shortcuts.load()
+    self._shortcuts = None # None to force errors. Load is in reset_for_show().
 
     # Component construction:
     #   - search bar
@@ -232,11 +232,18 @@ class Drawer(Gtk.ApplicationWindow):
     ck.connect("key-pressed", self._on_key_pressed)
     self.add_controller(ck)
 
-  def launch_app_and_exit(self, app_info: GioUnix.DesktopAppInfo):
+  def launch_app_and_hide(self, app_info: GioUnix.DesktopAppInfo):
     """
-      'exit' the app after launching an external process
+      hide the app after launching an external process
     """
     util.launch_app(app_info)
+    self.get_application().dismiss()
+
+  def launch_shortcut_and_hide(self, target: str):
+    """
+      hide the app after launching a user defined shortcut
+    """
+    util.open_target(target)
     self.get_application().dismiss()
 
   def reset_for_show(self):
@@ -363,7 +370,6 @@ class Drawer(Gtk.ApplicationWindow):
       self.web_row.set_visible(False)
 
     else:
-      raw = entry.get_text().strip()
       if (result := math.try_math(raw)) is not None:
         self.web_row.set_label(f"  Math result is {result}")
 
@@ -385,7 +391,7 @@ class Drawer(Gtk.ApplicationWindow):
 
     # an exact shortcut name runs immediately, ahead of any app match
     if (sc := shortcuts.match(self._shortcuts, raw, exact=True)):
-      shortcuts.launch(sc[1], self)
+      self.launch_shortcut_and_hide(sc[1])
       return
 
     # we first check for an app match and launch it
@@ -393,7 +399,7 @@ class Drawer(Gtk.ApplicationWindow):
     for cat, _h, _flow in self._categories:
       for app_info in self._apps_by_category.get(cat, []):
         if util.matches(app_info, query):
-          self.launch_app_and_exit(app_info)
+          self.launch_app_and_hide(app_info)
           return
 
     # then we check the other features
@@ -416,7 +422,7 @@ class Drawer(Gtk.ApplicationWindow):
       handle the execution of non-app search features
     """
     if (sc := shortcuts.match(self._shortcuts, text, exact=False)):
-      shortcuts.launch(sc[1], self)
+      self.launch_shortcut_and_hide(sc[1])
       return
 
     if (result := math.try_math(text)) is not None:
