@@ -1,0 +1,6 @@
+# name = "target"  (each target is handed to xdg-open)
+
+[shortcuts]
+journal = "/home/gc3/notes.md"
+docs = "/home/gc3/Documents/"
+red = "https://www.reddit.com"
