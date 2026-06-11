@@ -36,7 +36,7 @@ Tested on Hyprland.
   launches the first visible match
 - Daemon mode over a Unix socket so the client opens almost instantly
 - CSS styling of the GTK components (with examples)
-- TOML config file for basic customization (columns, icon size, search URL, …)
+- TOML config file for basic customization (columns, icon size, etc)
 
 ## Dependencies
 
@@ -80,16 +80,18 @@ hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
 
 ## Configuration
 
-Your files live in `~/.config/waydrawer/`:
+Files live in `~/.config/waydrawer/`:
 
-- `config.toml` — basic options (columns, icon size, search-fallback URL, …)
-- `shortcuts.toml` — your `name = "target"` shortcuts (each target is handed to `xdg-open`)
+user managed:
+
+- `config.toml` — basic options (columns, icon size, etc)
+- `shortcuts.toml` — your `name = "target"` shortcuts
 - `style.css` — CSS for the GTK widgets
-- `favorites.json` — pinned apps; managed automatically, no need to edit
 
-`config.toml` and `shortcuts.toml` are meant to be edited by hand *or* through
-the in-app settings view — either way, comments and formatting survive. The
-favorites file and the app cache are machine-managed JSON.
+waydrawer managed:
+
+- `favorites.json` — pinned apps storage
+
 
 Example files to copy from are in `config/`:
 
@@ -113,7 +115,6 @@ options:
   -s, --settings  open waydrawer on the settings view
 ```
 
-With a daemon running, `waydrawer` (or `--toggle`) shows the drawer instantly;
-`--settings` opens it straight to the settings view.
+With a daemon running, `waydrawer` (or `--toggle`) shows the drawer instantly. `--settings` opens it straight to the settings view.
 
 Without a daemon, each invocation is a slower, one-shot launch.
