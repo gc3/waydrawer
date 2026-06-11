@@ -22,33 +22,43 @@ from waydrawer import style
 
 
 class WayDrawerApp(Gtk.Application):
-  """ main Gtk application; one-shot or daemon """
+  """
+    main Gtk application; one-shot or daemon
+  """
 
-  def __init__(self, sock_path: str, daemon: bool, lock_fd):
+  def __init__(self, sock_path: str, daemon: bool, lock_fd,
+               start_in_settings: bool = False):
     super().__init__(
-      application_id = "org.local.waydrawer",
+      application_id = "io.github.gc3.waydrawer",
       flags = Gio.ApplicationFlags.NON_UNIQUE,
     )
 
     self._sock_path = sock_path
     self._daemon = daemon
     self._lock_fd = lock_fd
+    self._start_in_settings = start_in_settings  # one-shot only; daemon uses the socket
     self._window = None
     self._service = None
 
   # ----- window -----
-  def show(self):
+  def show(self, settings: bool = False):
     """
-      show the waydrawer ui
+      show the waydrawer ui, optionally landing on the settings view
     """
     if self._window is None:
       return
 
-    self._window.search.set_text("") # fresh search each show (resets the view)
     self._window.set_visible(True)
     self._window.present()
-    self._window.present()
-    GLib.idle_add(lambda: (self._window.reset_for_show(), False)[1])
+
+    # window must be mapped before we touch focus/layout, so defer to idle
+    if settings:
+      GLib.idle_add(lambda: (self._window.show_settings(), False)[1])
+
+    else:
+      self._window.search.set_text("")  # fresh search each show
+      GLib.idle_add(lambda: (self._window.reset_for_show(), False)[1])
+
 
   def dismiss(self):
     """
@@ -93,7 +103,7 @@ class WayDrawerApp(Gtk.Application):
 
     # build + show now
     self._window = ui.Drawer(self)
-    self.show()
+    self.show(self._start_in_settings)
 
 
   # ----- socket -----
@@ -151,6 +161,9 @@ class WayDrawerApp(Gtk.Application):
     cmd = data.get_data().decode("utf-8", "replace").strip()
     if cmd == "show":
       self.show()
+
+    elif cmd == "settings":
+      self.show(settings = True)
 
     elif cmd == "toggle":
       if (self._window is not None and self._window.get_visible()):

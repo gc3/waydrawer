@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 import sys
-import tomllib  # py 3.11+
-
 from pathlib import Path
+
+import tomlkit
 from gi.repository import GLib
 
 APP_NAME = "waydrawer"
@@ -45,14 +45,16 @@ CATEGORY_ORDER = [
   "Games", "Utilities", "System", "Education", "Science", "Other",
 ]
 
-def config_load():
+
+# ----------- API -------------------------------------------------------------
+def load():
   """ read the user's config file or give them the default values """
   cfg = dict(CFG_DEFAULTS)
 
   if CONFIG_FILE.exists():
     try:
-      with CONFIG_FILE.open("rb") as f:
-        user = tomllib.load(f)
+      with CONFIG_FILE.open("r", encoding="utf-8") as f:
+        user = tomlkit.load(f)
 
       # only adopt known keys; warn on unknown in case of mispellings
       for k, v in user.items():
@@ -62,10 +64,50 @@ def config_load():
         else:
           print(f"[waydrawer] unknown config key: {k!r}", file=sys.stderr)
 
-    except (OSError, tomllib.TOMLDecodeError) as e:
+    except (OSError, tomlkit.exceptions.ParseError) as e:
       print(f"[waydrawer] config error: {e}, using defaults", file=sys.stderr)
 
   return cfg
 
-# load the user's config.toml for others to use
-CFG = config_load()
+def save(key, value):
+  """
+    Set a single config key on disk, preserving any comments/formatting the
+    user has in config.toml, and keep the in-memory CFG in sync.
+  """
+  if key not in CFG_DEFAULTS:
+    raise KeyError(f"unknown config key: {key!r}")
+
+  doc = _config_doc()
+  doc[key] = value
+
+  CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+  with CONFIG_FILE.open("w", encoding="utf-8") as f:
+    tomlkit.dump(doc, f)
+
+  CFG[key] = value
+
+
+# ----------- Internal Helpers ----------------------------------------------------
+def _config_doc():
+  """
+    Return the existing config.toml as a tomlkit document (comments and
+    formatting intact), or a fresh document seeded with the defaults if the
+    file is missing or unparseable.
+  """
+  if CONFIG_FILE.exists():
+    try:
+      with CONFIG_FILE.open("r", encoding="utf-8") as f:
+        return tomlkit.load(f)
+
+    except (OSError, tomlkit.exceptions.ParseError) as e:
+      print(f"[waydrawer] config read error: {e}, rewriting from defaults",
+            file=sys.stderr)
+
+  doc = tomlkit.document()
+  for k, v in CFG_DEFAULTS.items():
+    doc[k] = v
+
+  return doc
+
+# ----------- LOAD EXTERNAL FILE --------------------------------------------------
+CFG = load()

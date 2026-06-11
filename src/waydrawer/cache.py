@@ -15,10 +15,51 @@ from gi.repository import GLib, Gio
 from waydrawer.app_info import AppInfo
 from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
-# ----------- Constants -----------------------------------------------------------
+
 CACHE_DIR = Path(GLib.get_user_cache_dir()) / "waydrawer"
 APPS_CACHE = CACHE_DIR / "apps.json"
 CACHE_VERSION = 3  # bump if you change the schema
+
+
+# ----------- API -------------------------------------------------------------
+def load_apps():
+  """
+    Returns dict of {category => [AppInfo, ...]} where categories point to a list of
+    apps in that category. Apps are sorted alphabetically.
+  """
+  mtime = _max_mtime()
+  if APPS_CACHE.exists():
+    try:
+      cached = json.loads(APPS_CACHE.read_text())
+      if cached.get("v") == CACHE_VERSION and cached.get("mtime") == mtime:
+        # * HIT *
+        #   rehydrate dicts -> AppInfo instances and return
+        result = []
+        for cat, apps in cached["sections"]:
+          rehydrated = [AppInfo.from_dict(d) for d in apps]
+          result.append([cat, rehydrated])
+        return result
+
+    except (OSError, ValueError, KeyError, TypeError) as e:
+      print(f"[waydrawer] cache read error: {e}", file=sys.stderr)
+
+  # * MISS *
+  #   reload all the app infos and then have them sorted
+  raw_apps = [
+    _serialize(a) for a in Gio.AppInfo.get_all()
+    if isinstance(a, Gio.DesktopAppInfo) and not a.get_nodisplay()
+  ]
+  sections = _categorize(raw_apps)
+
+  #   serialize AppInfo -> dict for JSON and write them to the cache
+  CACHE_DIR.mkdir(parents=True, exist_ok=True)
+  APPS_CACHE.write_text(json.dumps({
+    "v": CACHE_VERSION,
+    "mtime": mtime,
+    "sections": [[cat, [a.to_dict() for a in apps]] for cat, apps in sections],
+  }))
+
+  return sections
 
 
 # ----------- Internal Helpers ----------------------------------------------------
@@ -98,43 +139,3 @@ def _max_mtime():
         pass
 
   return m
-
-# ----------- API -------------------------------------------------------------
-def load_apps():
-  """
-    Returns dict of {category => [AppInfo, ...]} where categories point to a list of
-    apps in that category. Apps are sorted alphabetically.
-  """
-  mtime = _max_mtime()
-  if APPS_CACHE.exists():
-    try:
-      cached = json.loads(APPS_CACHE.read_text())
-      if cached.get("v") == CACHE_VERSION and cached.get("mtime") == mtime:
-        # * HIT *
-        #   rehydrate dicts -> AppInfo instances and return
-        result = []
-        for cat, apps in cached["sections"]:
-          rehydrated = [AppInfo.from_dict(d) for d in apps]
-          result.append([cat, rehydrated])
-        return result
-
-    except (OSError, ValueError, KeyError, TypeError) as e:
-      print(f"[waydrawer] cache read error: {e}", file=sys.stderr)
-
-  # * MISS *
-  #   reload all the app infos and then have them sorted
-  raw_apps = [
-    _serialize(a) for a in Gio.AppInfo.get_all()
-    if isinstance(a, Gio.DesktopAppInfo) and not a.get_nodisplay()
-  ]
-  sections = _categorize(raw_apps)
-
-  #   serialize AppInfo -> dict for JSON and write them to the cache
-  CACHE_DIR.mkdir(parents=True, exist_ok=True)
-  APPS_CACHE.write_text(json.dumps({
-    "v": CACHE_VERSION,
-    "mtime": mtime,
-    "sections": [[cat, [a.to_dict() for a in apps]] for cat, apps in sections],
-  }))
-
-  return sections

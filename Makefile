@@ -7,9 +7,9 @@ build: $(PYZ)
 $(PYZ): src/waydrawer/*.py
 	rm -rf $(STAGING)
 	mkdir -p $(STAGING) dist
-	cp -r src/waydrawer $(STAGING)/waydrawer
-	echo 'from waydrawer.__main__ import main; main()' > $(STAGING)/__main__.py
-	python -m zipapp $(STAGING) -o $@ -p "/usr/bin/env python3" -c
+	cp -r src/waydrawer $(STAGING)/
+	pip install --target $(STAGING) --no-compile tomlkit
+	python -m zipapp $(STAGING) -o $(PYZ) -m "waydrawer.__main__:main" -p '/usr/bin/env python3'
 
 tags:
 	ctags -R --languages=Python --fields=+l --extras=+q --python-kinds=-i src/

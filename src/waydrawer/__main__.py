@@ -66,7 +66,7 @@ def _daemonize():
   for fd in (0, 1, 2):
     os.dup2(devnull, fd)
 
-def _run_gtk(daemon_mode: bool) -> int:
+def _run_gtk(args: argparse.Namespace) -> int:
   """
     Run the waydrawer ui and do so in daemon mode if necessary. Note: We do some
     imports here locally, so we don't spend that time during the fast path.
@@ -84,13 +84,13 @@ def _run_gtk(daemon_mode: bool) -> int:
     print("[waydrawer] already running. Exiting...", file=sys.stderr)
     return 0
 
-  if daemon_mode:
+  if args.daemon:
     _daemonize()
 
   # We make the app to pre-load the ui for the future callers. We pass None when
-  # running since we parsed and all the args in main().
+  # running since we parsed all the args in main().
   from waydrawer.app import WayDrawerApp
-  app = WayDrawerApp(SOCK_PATH, daemon_mode, lock_fd)
+  app = WayDrawerApp(SOCK_PATH, args.daemon, lock_fd, start_in_settings=args.settings)
   return app.run(None)
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -119,17 +119,27 @@ def _build_parser() -> argparse.ArgumentParser:
     action="store_true",
     help="toggle the waydrawer ui"
   )
+  group.add_argument(
+    "-s", "--settings",
+    action="store_true",
+    help="open the settings window in a running daemon"
+  )
 
   return parser
 
 
 def main() -> int:
-  """ is yo maaan, on da floor """
+  """
+    is yo maaan, on da floor
+  """
   args = _build_parser().parse_args()
 
   # if he ain't ... lemme know
   if args.quit:
     _send(b"quit\n")
+    return 0
+
+  if args.settings and _send(b"settings\n"):
     return 0
 
   # let me see if you can run it, run it
@@ -141,7 +151,7 @@ def main() -> int:
       return 0
 
   # indeed i can run it, run it
-  return _run_gtk(args.daemon)
+  return _run_gtk(args)
 
 
 if __name__ == "__main__":
