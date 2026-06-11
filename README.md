@@ -80,15 +80,15 @@ hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
 
 ## Configuration
 
-Files live in `~/.config/waydrawer/`:
+Files live in `~/.config/waydrawer/`.
 
-user managed:
+User managed:
 
 - `config.toml` — basic options (columns, icon size, etc)
 - `shortcuts.toml` — your `name = "target"` shortcuts
 - `style.css` — CSS for the GTK widgets
 
-waydrawer managed:
+Waydrawer managed:
 
 - `favorites.json` — pinned apps storage
 
