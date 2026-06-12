@@ -27,6 +27,7 @@ def _send(cmd: bytes) -> bool:
   """
   s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
   try:
+    s.settimeout(0.5)
     s.connect(SOCK_PATH)
     s.sendall(cmd)
     return True

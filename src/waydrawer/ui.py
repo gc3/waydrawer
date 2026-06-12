@@ -325,40 +325,6 @@ class SettingsView(Gtk.Box):
     self.reload_shortcuts()
     return box
 
-  def _shortcut_row(self, name, target):
-    """
-      A single shortcut: name (read-only) + editable target + delete. To
-      rename, delete and re-add -- keeps us out of orphaned-key territory.
-    """
-    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
-    name_lbl = Gtk.Label(label=name, xalign=0)
-    name_lbl.set_size_request(120, -1)
-    row.append(name_lbl)
-
-    target_entry = Gtk.Entry()
-    target_entry.set_text(target)
-    target_entry.set_hexpand(True)
-    target_entry.connect(
-      "activate",
-      lambda e, n=name: shortcuts.save(n, e.get_text())
-    )
-    row.append(target_entry)
-
-    focus = Gtk.EventControllerFocus()
-    focus.connect(
-      "leave",
-      lambda _c, e=target_entry, n=name: shortcuts.save(n, e.get_text())
-    )
-    target_entry.add_controller(focus)
-
-    del_btn = Gtk.Button()
-    del_btn.set_icon_name("user-trash-symbolic")
-    del_btn.connect("clicked", lambda _b, n=name: self._on_delete_shortcut(n))
-    row.append(del_btn)
-
-    return row
-
   def _on_add_shortcut(self, _btn):
     name = self._sc_name.get_text().strip()
     target = self._sc_target.get_text().strip()

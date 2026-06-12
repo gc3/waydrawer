@@ -14,7 +14,7 @@ def load() -> list[str]:
   try:
     return json.loads(FAVORITES_FILE.read_text())
 
-  except (FileNotFoundError, json.JSONDecodeError):
+  except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError):
     return []
 
 def save(ids: list[str]) -> None:

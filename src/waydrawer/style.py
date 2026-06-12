@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import sys
 
+# pylint: disable=wrong-import-position
+import gi
+gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib
+
 from waydrawer.config import CONFIG_DIR
 
 USER_CSS_FILE = CONFIG_DIR / "style.css"
@@ -56,6 +60,7 @@ entry:focus { background-color: rgba(255,255,255,0.10); }
 scrollbar { background: transparent; }
 scrollbar slider { background-color: rgba(255,255,255,0.18); border-radius: 6px; }
 """
+
 
 def setup_css() -> None:
   """ load the css from the users style.css or get the default """

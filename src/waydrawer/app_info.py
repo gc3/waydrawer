@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict, fields
 from typing import List, Optional
+
 from gi.repository import Gio
 
 @dataclass

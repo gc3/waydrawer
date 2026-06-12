@@ -20,6 +20,7 @@ _OPS = {
   ast.UAdd: operator.pos,
 }
 
+
 def try_math(expr: str):
   """Evaluate expr if it looks like arithmetic. Return result string or None."""
   expr = expr.strip()

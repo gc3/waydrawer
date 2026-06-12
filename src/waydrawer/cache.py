@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 import sys
-
 from pathlib import Path
+
 from gi.repository import GLib, Gio
 
 from waydrawer.app_info import AppInfo

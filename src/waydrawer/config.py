@@ -10,12 +10,12 @@ import sys
 from pathlib import Path
 
 import tomlkit
+
 from gi.repository import GLib
 
 APP_NAME = "waydrawer"
 CONFIG_DIR = Path(GLib.get_user_config_dir()) / APP_NAME
 CONFIG_FILE = CONFIG_DIR / "config.toml"
-FAVORITES_FILE = CONFIG_DIR / "favorites.json"
 
 # defaults for config file entries if we have no file
 CFG_DEFAULTS = {
