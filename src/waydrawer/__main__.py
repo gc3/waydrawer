@@ -41,13 +41,17 @@ def _send(cmd: bytes) -> bool:
 def _ensure_preload():
   """
     Re-exec once with LD_PRELOAD set (guarded so it only fires on the first pass).
+    Originals are stashed so spawned children can be given a clean environment.
 
     Linker must load libgtk4-layer-shell.so before libwayland-client.so.
     https://github.com/wmww/gtk4-layer-shell/blob/main/linking.md
   """
   preload = "/usr/lib/x86_64-linux-gnu/libgtk4-layer-shell.so"
   if os.path.exists(preload) and "gtk4-layer-shell" not in os.environ.get("LD_PRELOAD", ""):
-    os.environ["LD_PRELOAD"] = preload
+    orig = os.environ.get("LD_PRELOAD", "")
+    os.environ["_WAYDRAWER_ORIG_LD_PRELOAD"] = orig
+    os.environ["_WAYDRAWER_ORIG_PYTHONPATH"] = os.environ.get("PYTHONPATH", "")
+    os.environ["LD_PRELOAD"] = f"{preload}:{orig}" if orig else preload
     os.environ["PYTHONPATH"] = ":".join(sys.path)
     os.execv(sys.executable, [sys.executable] + sys.argv)
 

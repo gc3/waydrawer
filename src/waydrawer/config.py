@@ -54,15 +54,24 @@ def load():
   if CONFIG_FILE.exists():
     try:
       with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        user = tomlkit.load(f)
+        user = tomlkit.load(f).unwrap()
 
-      # only adopt known keys; warn on unknown in case of mispellings
+      # only adopt known keys with the right type; warn otherwise.
+      # NB: bool is an int subclass, so an exact type match is required.
       for k, v in user.items():
-        if k in CFG_DEFAULTS:
-          cfg[k] = v
+        if k not in CFG_DEFAULTS:
+          print(f"[waydrawer] unknown config key: {k!r}", file=sys.stderr)
+
+        elif type(v) is not type(CFG_DEFAULTS[k]):
+          print(
+            f"[waydrawer] config key {k!r}: expected "
+            f"{type(CFG_DEFAULTS[k]).__name__}, got {type(v).__name__}; "
+            "using default",
+            file=sys.stderr,
+          )
 
         else:
-          print(f"[waydrawer] unknown config key: {k!r}", file=sys.stderr)
+          cfg[k] = v
 
     except (OSError, tomlkit.exceptions.ParseError) as e:
       print(f"[waydrawer] config error: {e}, using defaults", file=sys.stderr)

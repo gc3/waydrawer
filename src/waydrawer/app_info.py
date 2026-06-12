@@ -13,7 +13,9 @@ from gi.repository import Gio
 
 @dataclass
 class AppInfo:
-  """Cached facade mimicking Gio.DesktopAppInfo"""
+  """
+    Cached facade mimicking Gio.DesktopAppInfo
+  """
 
   # pylint: disable=too-many-instance-attributes
   id: str
@@ -39,7 +41,9 @@ class AppInfo:
   def get_keywords(self) -> List[str]:    return self.keywords
 
   def get_icon(self) -> Optional[Gio.Icon]:
-    """Returns a Gio.Icon (themed or file), or None if no icon set."""
+    """
+      Returns a Gio.Icon (themed or file), or None if no icon set.
+    """
     if not self.icon:
       return None
 
@@ -48,13 +52,15 @@ class AppInfo:
 
     return Gio.ThemedIcon.new(self.icon)
 
-  def launch(self) -> bool:
-    """Reconstruct DesktopAppInfo and launch. Parse cost paid once, on use."""
+  def launch(self, files=None, context=None) -> bool:
+    """
+      Reconstruct DesktopAppInfo and launch. Parse cost paid once, on use.
+    """
     info = Gio.DesktopAppInfo.new_from_filename(self.filename)
     if info is None:
       return False
 
-    return info.launch([], None)
+    return info.launch(files or [], context)
 
   # --- serialization ---
   @classmethod

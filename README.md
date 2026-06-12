@@ -51,7 +51,7 @@ Runtime:
 On Ubuntu:
 
 ```sh
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0 wl-clipboard xdg-utils
+sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0 python3-setproctitle wl-clipboard xdg-utils
 ```
 
 ## Install

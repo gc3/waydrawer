@@ -5,14 +5,16 @@
 from __future__ import annotations
 
 import re
+import os
 import sys
 import subprocess
 from urllib.parse import quote_plus
 
 # pylint: disable=wrong-import-position
 import gi
+gi.require_version("Gdk", "4.0")
 gi.require_version("GioUnix", "2.0")
-from gi.repository import Gio, GioUnix, GLib
+from gi.repository import Gdk, Gio, GioUnix, GLib
 
 from waydrawer.config import CFG
 
@@ -45,34 +47,57 @@ def looks_like_url(s: str) -> bool:
 
 
 # ----------- Process/App Launching -------------------------------------------
-def launch_app(ai: GioUnix.DesktopAppInfo) -> None:
+def launch_app(ai) -> None:
   """
-    Launch the app represented by the given app info.
+    Launch the app represented by the given app info (our cached facade).
+
+    Gio handles the .desktop fine print for us: field-code expansion (%f, %u,
+    %%, embedded forms like --file=%f), Path= working dir, and Terminal=true.
+    The context undoes our env injection and provides an xdg-activation token
+    so the new window actually gets focus on Wayland.
   """
-  cmdline = ai.get_commandline()
-  if not cmdline:
-    # DBusActivatable or no Exec= — fall back to GIO
-    try:
-      ai.launch([], None)
-
-    except GLib.Error as e:
-      print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
-    return
-
   try:
-    _ok, argv = GLib.shell_parse_argv(cmdline)
+    ai.launch([], _launch_ctx())
 
   except GLib.Error as e:
-    print(f"[waydrawer] failed to parse Exec=: {e}", file=sys.stderr)
-    return
-
-  # Strip .desktop field codes (%f %F %u %U %i %c %k ...)
-  argv = [a for a in argv if not (len(a) == 2 and a.startswith("%"))]
-  try:
-    spawn_detached(argv)
-
-  except OSError as e:
     print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+
+
+def _launch_ctx() -> Gio.AppLaunchContext:
+  """
+    Launch context for child apps. Prefer the Gdk one (carries an
+    xdg-activation focus token on Wayland); fall back to plain Gio if no
+    display. Either way, scrub the re-exec env injection (see child_env).
+  """
+  display = Gdk.Display.get_default()
+  ctx = display.get_app_launch_context() if display else Gio.AppLaunchContext()
+  env = child_env()
+
+  for var in ("LD_PRELOAD", "PYTHONPATH"):
+    ctx.unsetenv(f"_WAYDRAWER_ORIG_{var}") # undo our temp saves for the kids
+    if var in env:
+      ctx.setenv(var, env[var])
+
+    else:
+      ctx.unsetenv(var)
+
+  return ctx
+
+def child_env() -> dict[str, str]:
+  """
+    Environment for spawned children: undo the LD_PRELOAD / PYTHONPATH
+    injection done by the re-exec in __main__, restoring pre-exec values.
+  """
+  env = dict(os.environ)
+  for var in ("LD_PRELOAD", "PYTHONPATH"):
+    orig = env.pop(f"_WAYDRAWER_ORIG_{var}", None)
+    if orig:
+      env[var] = orig
+
+    elif orig is not None:        # stash exists but was empty -> var was unset
+      env.pop(var, None)
+
+  return env
 
 def open_target(target: str) -> None:
   """
@@ -85,7 +110,7 @@ def open_target(target: str) -> None:
   """
   try:
     uri = Gio.File.new_for_commandline_arg(target).get_uri()
-    Gio.AppInfo.launch_default_for_uri(uri, None)
+    Gio.AppInfo.launch_default_for_uri(uri, _launch_ctx())
 
   except GLib.Error:
     spawn_detached(["xdg-open", target])
@@ -112,6 +137,7 @@ def spawn_detached(argv: list[str]) -> None:
   """
   subprocess.Popen(   # pylint: disable=consider-using-with
     argv,
+    env=child_env(),
     stdin=subprocess.DEVNULL,
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
