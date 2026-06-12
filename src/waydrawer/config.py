@@ -16,6 +16,7 @@ from gi.repository import GLib
 APP_NAME = "waydrawer"
 CONFIG_DIR = Path(GLib.get_user_config_dir()) / APP_NAME
 CONFIG_FILE = CONFIG_DIR / "config.toml"
+CFG_MTIME = CONFIG_FILE.stat().st_mtime_ns if CONFIG_FILE.exists() else None
 
 # defaults for config file entries if we have no file
 CFG_DEFAULTS = {
@@ -78,6 +79,31 @@ def load():
 
   return cfg
 
+# ----------- API -------------------------------------------------------------
+def reload():
+  """
+    Re-read config.toml if it changed on disk since we last saw it. Returns
+    True if values were reloaded.
+
+    XXX:  CFG is mutated in place, never re-bound because other modules import the
+          dict object directly (`from waydrawer.config import CFG`).
+  """
+  global CFG_MTIME  # pylint: disable=global-statement
+
+  try:
+    mtime = CONFIG_FILE.stat().st_mtime_ns
+
+  except FileNotFoundError:
+    return False        # file gone: keep current values
+
+  if mtime == CFG_MTIME:
+    return False
+
+  CFG_MTIME = mtime
+  CFG.clear()
+  CFG.update(load())
+  return True
+
 def save(key, value):
   """
     Set a single config key on disk, preserving any comments/formatting the
@@ -118,5 +144,6 @@ def _config_doc():
 
   return doc
 
-# ----------- LOAD EXTERNAL FILE --------------------------------------------------
+
+# ----------- LOAD CONFIG FILE -------------------------------------------------
 CFG = load()

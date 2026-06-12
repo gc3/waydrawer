@@ -56,7 +56,6 @@ class WayDrawerApp(Gtk.Application):
       GLib.idle_add(lambda: (self._window.show_settings(), False)[1])
 
     else:
-      self._window.search.set_text("")  # fresh search each show
       GLib.idle_add(lambda: (self._window.reset_for_show(), False)[1])
 
 
@@ -68,7 +67,9 @@ class WayDrawerApp(Gtk.Application):
       self._window.set_visible(False)
 
     else:
-      self.quit()
+      # window gone -> use count drops -> run() returns once any in-flight
+      # launch releases its hold. quit() would kill pending launches.
+      self._window.destroy()
 
 
   # ----- lifecycle -----

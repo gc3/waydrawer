@@ -49,24 +49,58 @@ def looks_like_url(s: str) -> bool:
 # ----------- Process/App Launching -------------------------------------------
 def launch_app(ai) -> None:
   """
-    Launch the app represented by the given app info (our cached facade).
+    Launch the app represented by the given app info. We use Gio to handle the
+    .desktop fine print for us.
 
-    Gio handles the .desktop fine print for us: field-code expansion (%f, %u,
-    %%, embedded forms like --file=%f), Path= working dir, and Terminal=true.
-    The context undoes our env injection and provides an xdg-activation token
-    so the new window actually gets focus on Wayland.
+    NB: Launch async since in non-daemon mode we may close before the launch ends
   """
-  try:
-    ai.launch([], _launch_ctx())
+  app = Gio.Application.get_default()
+  if app:
+    app.hold()
 
-  except GLib.Error as e:
-    print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+  def done(src, res):
+    try:
+      src.launch_uris_finish(res)
 
+    except GLib.Error as e:
+      print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+
+    if app:
+      app.release()
+
+  if not ai.launch_async(_launch_ctx(), done):
+    print(f"[waydrawer] cannot load {ai.get_id()}", file=sys.stderr)
+    if app:
+      app.release()
+
+def launch_default_app(target: str) -> None:
+  """
+    Used primarily for shortcuts, this opens target with the user's registered
+    default handler.
+
+    NB: Launch async since in non-daemon mode we may close before the launch ends
+  """
+  uri = Gio.File.new_for_commandline_arg(target).get_uri()
+  app = Gio.Application.get_default()
+  if app:
+    app.hold()
+
+  def done(_src, res):
+    try:
+      Gio.AppInfo.launch_default_for_uri_finish(res)
+
+    except GLib.Error:
+      spawn_detached(["xdg-open", target])
+
+    if app:
+      app.release()
+
+  Gio.AppInfo.launch_default_for_uri_async(uri, _launch_ctx(), None, done)
 
 def _launch_ctx() -> Gio.AppLaunchContext:
   """
     Launch context for child apps. Prefer the Gdk one (carries an
-    xdg-activation focus token on Wayland); fall back to plain Gio if no
+    xdg-activation focus token on Wayland). Fall back to plain Gio if no
     display. Either way, scrub the re-exec env injection (see child_env).
   """
   display = Gdk.Display.get_default()
@@ -98,22 +132,6 @@ def child_env() -> dict[str, str]:
       env.pop(var, None)
 
   return env
-
-def open_target(target: str) -> None:
-  """
-    Used primarily for shortcuts, this opens target with the user's registered
-    default handler.
-
-    Prefer the in-process GLib path: no external binary, and it honors
-    Terminal=true so terminal apps (vim, …) get a real terminal. Fall back to
-    xdg-open only when GLib has no default registered for the target.
-  """
-  try:
-    uri = Gio.File.new_for_commandline_arg(target).get_uri()
-    Gio.AppInfo.launch_default_for_uri(uri, _launch_ctx())
-
-  except GLib.Error:
-    spawn_detached(["xdg-open", target])
 
 def web_search(query: str) -> None:
   """
