@@ -53,28 +53,6 @@ class AppInfo:
 
     return Gio.ThemedIcon.new(self.icon)
 
-  def launch(self, files=None, context=None) -> bool:
-    """
-      Reconstruct DesktopAppInfo and launch. Parse cost paid once, on use.
-    """
-    info = Gio.DesktopAppInfo.new_from_filename(self.filename)
-    if info is None:
-      return False
-
-    return info.launch(files or [], context)
-
-  def launch_async(self, context, callback) -> bool:
-    """
-      Like launch(), but via the async GIO path; callback gets (info, result)
-      and must call launch_uris_finish.
-    """
-    info = Gio.DesktopAppInfo.new_from_filename(self.filename)
-    if info is None:
-      return False
-
-    info.launch_uris_async([], context, None, callback)
-    return True
-
   # --- serialization ---
   @classmethod
   def from_dict(cls, d: dict) -> "AppInfo":

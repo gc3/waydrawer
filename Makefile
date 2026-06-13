@@ -1,10 +1,11 @@
 PYZ     := dist/waydrawer
 STAGING := build/staging
 PREFIX  ?= $(HOME)/.local
+SOURCES := $(shell find src/waydrawer -name '*.py')
 
 build: $(PYZ)
 
-$(PYZ): src/waydrawer/*.py
+$(PYZ): $(SOURCES)
 	rm -rf $(STAGING)
 	mkdir -p $(STAGING) dist
 	cp -r src/waydrawer $(STAGING)/

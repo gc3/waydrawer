@@ -122,11 +122,16 @@ class LauncherView(Gtk.Box):
     """
     self.search.grab_focus()
 
-  def launch_app_and_hide(self, ai: GioUnix.DesktopAppInfo):
+  def launch_app_and_hide(self, ai):
     """
       Launch the app represented by the given app info. Gio handles the
       .desktop fine print for us.
     """
+    info = Gio.DesktopAppInfo.new_from_filename(ai.filename)
+    if info is None:
+      print(f"[waydrawer] cannot load {ai.get_id()}", file=sys.stderr)
+      return
+
     def finish(src, res):
       try:
         src.launch_uris_finish(res)
@@ -134,10 +139,7 @@ class LauncherView(Gtk.Box):
       except GLib.Error as e:
         print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
 
-    if not ai.launch_async(_launch_ctx(), _held(finish)):
-      print(f"[waydrawer] cannot load {ai.get_id()}", file=sys.stderr)
-      return
-
+    info.launch_uris_async([], _launch_ctx(), None, _held(finish))
     self._drawer.dismiss()
 
   def launch_shortcut_and_hide(self, target: str):
@@ -486,6 +488,9 @@ def _held(finish):
     launch completes. Async launches go over a GLib/D-Bus round trip and in
     non-daemon mode we may exit before it ends -- the hold keeps the process
     alive until the callback fires.
+
+    Caller contract:  only invoke _held once the async op is guaranteed to
+                      start, since the release lives in the returned callback.
   """
   app = Gio.Application.get_default()
   if app:
