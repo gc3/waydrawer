@@ -5,23 +5,24 @@
 """
 from __future__ import annotations
 
+import re
+import os
 import shutil
+import sys
 import subprocess
+from urllib.parse import quote_plus
 
 # pylint: disable=wrong-import-position
 import gi
 gi.require_version("Gtk", "4.0")
-gi.require_version("Gtk4LayerShell", "1.0")
 gi.require_version("GioUnix", "2.0")
-from gi.repository import GioUnix, Gtk, Gdk
+from gi.repository import Gdk, GioUnix, Gio, GLib, Gtk
 
 from waydrawer import cache
 from waydrawer import config
 from waydrawer import favorites
 from waydrawer import math
 from waydrawer import shortcuts
-from waydrawer import util
-
 
 class LauncherView(Gtk.Box):
   """
@@ -121,19 +122,40 @@ class LauncherView(Gtk.Box):
     """
     self.search.grab_focus()
 
-  def launch_app_and_hide(self, app_info: GioUnix.DesktopAppInfo):
+  def launch_app_and_hide(self, ai: GioUnix.DesktopAppInfo):
     """
-      hide the app after launching an external process
+      Launch the app represented by the given app info. Gio handles the
+      .desktop fine print for us.
     """
-    util.launch_app(app_info)
-    self._drawer.get_application().dismiss()
+    def finish(src, res):
+      try:
+        src.launch_uris_finish(res)
+
+      except GLib.Error as e:
+        print(f"[waydrawer] launch failed: {e}", file=sys.stderr)
+
+    if not ai.launch_async(_launch_ctx(), _held(finish)):
+      print(f"[waydrawer] cannot load {ai.get_id()}", file=sys.stderr)
+      return
+
+    self._drawer.dismiss()
 
   def launch_shortcut_and_hide(self, target: str):
     """
-      hide the app after launching a user defined shortcut
+      Opens target with the user's registered default handler. Falls back to
+      xdg-open if the launch fails.
     """
-    util.launch_default_app(target)
-    self._drawer.get_application().dismiss()
+    uri = Gio.File.new_for_commandline_arg(target).get_uri()
+
+    def finish(_src, res):
+      try:
+        Gio.AppInfo.launch_default_for_uri_finish(res)
+
+      except GLib.Error:
+        _spawn_detached(["xdg-open", target])
+
+    Gio.AppInfo.launch_default_for_uri_async(uri, _launch_ctx(), None, _held(finish))
+    self._drawer.dismiss()
 
   # ----- component construction helpers -----
   def _setup_app_grid(self, app_grid):
@@ -182,14 +204,14 @@ class LauncherView(Gtk.Box):
     any_visible = False
     for cat, header, flow in self._categories:
       apps = self._apps_by_category.get(cat, [])
-      has_match = any(util.matches(a, q) for a in apps)
+      has_match = any(_matches(a, q) for a in apps)
       header.set_visible(has_match)
       flow.set_visible(has_match)
 
       if has_match:
         any_visible = True
         flow.set_filter_func(
-          lambda child, qq=q: util.matches(child.get_child().app_info, qq)
+          lambda child, qq=q: _matches(child.get_child().app_info, qq)
         )
         flow.invalidate_filter()
 
@@ -207,7 +229,7 @@ class LauncherView(Gtk.Box):
       if (result := math.try_math(raw)) is not None:
         self.web_row.set_label(f"  Math result is {result}")
 
-      elif util.looks_like_url(raw):
+      elif _looks_like_url(raw):
         self.web_row.set_label(f"  Open  {raw}")
 
       else:
@@ -232,7 +254,7 @@ class LauncherView(Gtk.Box):
     query = raw.lower()
     for cat, _h, _flow in self._categories:
       for app_info in self._apps_by_category.get(cat, []):
-        if util.matches(app_info, query):
+        if _matches(app_info, query):
           self.launch_app_and_hide(app_info)
           return
 
@@ -271,13 +293,13 @@ class LauncherView(Gtk.Box):
 
       self.web_row.set_label("  Math result is copied to clipboard!")
 
-    elif util.looks_like_url(text):
-      util.open_url(text)
+    elif _looks_like_url(text):
+      _open_url(text)
 
     else:
-      util.web_search(text)
+      _open_url(config.CFG["search_url"].format(quote_plus(text)))
 
-    self._drawer.get_application().dismiss()
+    self._drawer.dismiss()
 
 
 # ----------- Rows (drawer sections) ------------------------------------------
@@ -397,7 +419,7 @@ class AppTile(Gtk.Button):
     self.apply_config()
 
   def apply_config(self):
-    """ 
+    """
       re-apply config values baked in at construction
     """
     self._icon.set_pixel_size(config.CFG["icon_size"])
@@ -411,9 +433,9 @@ class AppTile(Gtk.Button):
     self.launcher.fav_row.toggle_app(self.app_info.get_id())
 
 
-# ----------- Helper Functions ------------------------------------------------
+# ----------- Internal Helpers ------------------------------------------------
 def _apply_flow_config(flow):
-  """ 
+  """
     push current CFG onto a tile FlowBox and its children
   """
   flow.set_max_children_per_line(config.CFG["columns"])
@@ -421,3 +443,111 @@ def _apply_flow_config(flow):
   while child is not None:
     child.get_child().apply_config()
     child = child.get_next_sibling()
+
+# --- string checks ---
+def _matches(app_info: GioUnix.DesktopAppInfo, q: str) -> bool:
+  """
+    Given some app info and a query, return true if they match.
+  """
+  if not q:
+    return True
+
+  name = (app_info.get_display_name() or "").lower()
+  generic = (app_info.get_generic_name() or "").lower()
+  keywords = " ".join(app_info.get_keywords() or []).lower()
+  return q in name or q in generic or q in keywords
+
+def _looks_like_url(s: str) -> bool:
+  """
+    Return true if the given string looks like a URL
+  """
+  s = s.strip()
+  if not s or " " in s:
+    return False
+
+  if s.startswith(("http://", "https://", "file://")):
+    return True
+
+  return bool(re.match(r"^[\w.-]+\.[a-z]{2,}(/.*)?$", s, re.IGNORECASE))
+
+# --- app lauching ---
+def _open_url(url: str) -> None:
+  """
+    Given a url, open it in the default browser
+  """
+  if not url.startswith(("http://", "https://", "file://")):
+    url = "https://" + url
+
+  _spawn_detached(["xdg-open", url])
+
+def _held(finish):
+  """
+    Wrap an async-finish callback so the application is held alive until the
+    launch completes. Async launches go over a GLib/D-Bus round trip and in
+    non-daemon mode we may exit before it ends -- the hold keeps the process
+    alive until the callback fires.
+  """
+  app = Gio.Application.get_default()
+  if app:
+    app.hold()
+
+  def done(src, res):
+    try:
+      finish(src, res)
+
+    finally:
+      if app:
+        app.release()
+
+  return done
+
+def _launch_ctx() -> Gio.AppLaunchContext:
+  """
+    Launch context for child apps. Prefer the Gdk one (carries an
+    xdg-activation focus token on Wayland). Fall back to plain Gio if no
+    display. Either way, scrub the re-exec env injection (see _child_env).
+  """
+  display = Gdk.Display.get_default()
+  ctx = display.get_app_launch_context() if display else Gio.AppLaunchContext()
+  env = _child_env()
+
+  for var in ("LD_PRELOAD", "PYTHONPATH"):
+    ctx.unsetenv(f"_WAYDRAWER_ORIG_{var}") # undo our temp saves for the kids
+    if var in env:
+      ctx.setenv(var, env[var])
+
+    else:
+      ctx.unsetenv(var)
+
+  return ctx
+
+def _spawn_detached(argv: list[str]) -> None:
+  """
+    Launch the given process defined by argv as a totall disconnected process
+    from waydrawer so their futures aren't intertwined.
+  """
+  subprocess.Popen(   # pylint: disable=consider-using-with
+    argv,
+    env=_child_env(),
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    start_new_session=True,
+    close_fds=True,
+  )
+
+def _child_env() -> dict[str, str]:
+  """
+    Environment for spawned children: undo the LD_PRELOAD / PYTHONPATH
+    injection done by the re-exec in __main__, restoring pre-exec values.
+  """
+  env = dict(os.environ)
+  for var in ("LD_PRELOAD", "PYTHONPATH"):
+    orig = env.pop(f"_WAYDRAWER_ORIG_{var}", None)
+    if orig:
+      env[var] = orig
+
+    elif orig is not None:        # stash exists but was empty -> var was unset
+      env.pop(var, None)
+
+  return env

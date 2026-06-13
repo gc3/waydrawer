@@ -110,6 +110,12 @@ class Drawer(Gtk.ApplicationWindow):
     self._stack.set_visible_child_name("launcher")
     self._launcher_view.focus_search()
 
+  def dismiss(self):
+    """
+      Keep all the calls to dismissing the ui from various views in one place.
+    """
+    self.get_application().dismiss()
+
   # ----- component construction helpers -----
   def _setup_overlay(self):
     """
@@ -141,7 +147,7 @@ class Drawer(Gtk.ApplicationWindow):
       target = target.get_parent()
 
     # if it's outside the drawer? close ourselves
-    self.get_application().dismiss()
+    self.dismiss()
 
   def _on_key_pressed(self, _kc, keyval, _kc2, _state):
     if ret := keyval == Gdk.KEY_Escape:
@@ -151,6 +157,6 @@ class Drawer(Gtk.ApplicationWindow):
 
       else:
         # then dismisses the drawer
-        self.get_application().dismiss()
+        self.dismiss()
 
     return ret
