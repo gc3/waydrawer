@@ -20,6 +20,7 @@ _OPS = {
   ast.UAdd: operator.pos,
 }
 
+_MAX_EXP = 1000   # cap pow exponent so e.g. 9^9^9 can't build a giant int and hang
 
 def try_math(expr: str):
   """Evaluate expr if it looks like arithmetic. Return result string or None."""
@@ -45,7 +46,11 @@ def try_math(expr: str):
       return node.value
 
     if isinstance(node, ast.BinOp) and type(node.op) in _OPS:
-      return _OPS[type(node.op)](_eval(node.left), _eval(node.right))
+      left, right = _eval(node.left), _eval(node.right)
+      if isinstance(node.op, ast.Pow) and abs(right) > _MAX_EXP:
+        raise ValueError("exponent too large")
+
+      return _OPS[type(node.op)](left, right)
 
     if isinstance(node, ast.UnaryOp) and type(node.op) in _OPS:
       return _OPS[type(node.op)](_eval(node.operand))

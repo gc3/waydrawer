@@ -79,7 +79,6 @@ def load():
 
   return cfg
 
-# ----------- API -------------------------------------------------------------
 def reload():
   """
     Re-read config.toml if it changed on disk since we last saw it. Returns
@@ -108,6 +107,8 @@ def save(key, value):
   """
     Set a single config key on disk, preserving any comments/formatting the
     user has in config.toml, and keep the in-memory CFG in sync.
+
+    NB: this intentionally ignores CFG_MTIME
   """
   if key not in CFG_DEFAULTS:
     raise KeyError(f"unknown config key: {key!r}")

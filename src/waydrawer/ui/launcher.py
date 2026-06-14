@@ -40,11 +40,7 @@ class LauncherView(Gtk.Box):
     # Data:
     #   load in all the app data from the .desktop files
     self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
-    self._apps_by_category = dict(cache.load_apps())
-    all_apps_by_id = {}
-    for apps in self._apps_by_category.values():
-      for a in apps:
-        all_apps_by_id[a.id] = a
+    all_apps_by_id = self._load_apps()
 
     #   read all the user shortcuts from disk
     self._shortcuts = shortcuts.load()
@@ -101,7 +97,7 @@ class LauncherView(Gtk.Box):
     """
       make this view current with on-disk state
     """
-    # reload the shortcuts and config variables if they've changed
+    self._load_apps()
     self._shortcuts = shortcuts.load()
     if config.reload():
       self.apply_config()
@@ -160,6 +156,15 @@ class LauncherView(Gtk.Box):
     self._drawer.dismiss()
 
   # ----- component construction helpers -----
+  def _load_apps(self):
+    self._apps_by_category = dict(cache.load_apps())
+    all_apps_by_id = {}
+    for apps in self._apps_by_category.values():
+      for a in apps:
+        all_apps_by_id[a.id] = a
+
+    return all_apps_by_id
+
   def _setup_app_grid(self, app_grid):
     """
       Populate app_grid with one labeled FlowBox per non-empty category.
@@ -203,6 +208,7 @@ class LauncherView(Gtk.Box):
       self.web_row.set_visible(False)
       return
 
+    # refilter the grid first so it's correct regardless of the suggestion below
     any_visible = False
     for cat, header, flow in self._categories:
       apps = self._apps_by_category.get(cat, [])
@@ -217,27 +223,35 @@ class LauncherView(Gtk.Box):
         )
         flow.invalidate_filter()
 
-    # a matching shortcut owns the suggestion bar (this is the typeahead)
+    # the bar must advertise exactly what Enter does, or it lies. Enter's order:
+    # exact shortcut -> first app -> _handle_non_apps (prefix sc / math / url / web)
     raw = entry.get_text().strip()
-    if (sc := shortcuts.match(self._shortcuts, raw, exact=False)):
-      self.web_row.set_label(f"  Open  {sc[0]}")
+
+    # 1. exact shortcut wins outright, ahead of any app match
+    if (sc := shortcuts.match(self._shortcuts, raw, exact=True)):
+      self.web_row.set_label(f"  Open Shortcut '{sc[0]}'")
       self.web_row.set_visible(True)
       return
 
+    # 2. apps matched -> Enter launches the first tile; no bar suggestion
     if any_visible:
       self.web_row.set_visible(False)
+      return
+
+    # 3. no apps -> same fallback chain _handle_non_apps uses
+    if (sc := shortcuts.match(self._shortcuts, raw, exact=False)):
+      self.web_row.set_label(f"  Open Shortcut '{sc[0]}'")
+
+    elif (result := math.try_math(raw)) is not None:
+      self.web_row.set_label(f"  Math result is {result}")
+
+    elif _looks_like_url(raw):
+      self.web_row.set_label(f"  Open  {raw}")
 
     else:
-      if (result := math.try_math(raw)) is not None:
-        self.web_row.set_label(f"  Math result is {result}")
+      self.web_row.set_label(f"  Search the web for  \u201c{raw}\u201d")
 
-      elif _looks_like_url(raw):
-        self.web_row.set_label(f"  Open  {raw}")
-
-      else:
-        self.web_row.set_label(f"  Search the web for  \u201c{raw}\u201d")
-
-      self.web_row.set_visible(True)
+    self.web_row.set_visible(True)
 
   def _on_search_activate(self, entry: Gtk.SearchEntry):
     """
@@ -292,8 +306,6 @@ class LauncherView(Gtk.Box):
       else:
         # fallback: best-effort, may not survive focus loss on layer-shell
         Gdk.Display.get_default().get_clipboard().set(out)
-
-      self.web_row.set_label("  Math result is copied to clipboard!")
 
     elif _looks_like_url(text):
       _open_url(text)

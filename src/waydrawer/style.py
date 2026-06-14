@@ -63,10 +63,26 @@ scrollbar slider { background-color: rgba(255,255,255,0.18); border-radius: 6px;
 
 
 def setup_css() -> None:
-  """ load the css from the users style.css or get the default """
+  """
+    load the css from the users style.css to layer on top of the default
+  """
 
+  # default CSS used no matter what
+  provider = Gtk.CssProvider()
+  if hasattr(provider, "load_from_string"):
+    provider.load_from_string(DEFAULT_CSS.decode())
+
+  else:
+    provider.load_from_data(DEFAULT_CSS, -1)
+
+    Gtk.StyleContext.add_provider_for_display(
+      Gdk.Display.get_default(),
+      provider,
+      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
+
+  # user CSS override (loaded at PRIORITY_USER so it stacks on top of defaults)
   if USER_CSS_FILE.exists():
-    # user CSS override (loaded at PRIORITY_USER so it stacks on top of defaults)
     try:
       user_provider = Gtk.CssProvider()
       user_provider.load_from_path(str(USER_CSS_FILE))
@@ -78,18 +94,3 @@ def setup_css() -> None:
 
     except GLib.Error as e:
       print(f"[waydrawer] user css error: {e}", file=sys.stderr)
-
-  else:
-    # default CSS used if there's no user file
-    provider = Gtk.CssProvider()
-    if hasattr(provider, "load_from_string"):
-      provider.load_from_string(DEFAULT_CSS.decode())
-
-    else:
-      provider.load_from_data(DEFAULT_CSS, -1)
-
-    Gtk.StyleContext.add_provider_for_display(
-      Gdk.Display.get_default(),
-      provider,
-      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-    )
