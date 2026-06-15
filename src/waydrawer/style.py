@@ -89,7 +89,7 @@ def setup_css() -> None:
       user_provider.load_from_path(str(USER_CSS_FILE))
       Gtk.StyleContext.add_provider_for_display(
         display,
-        user_provider, 
+        user_provider,
         Gtk.STYLE_PROVIDER_PRIORITY_USER,
       )
 

@@ -40,7 +40,7 @@ class LauncherView(Gtk.Box):
     # Data:
     #   load in all the app data from the .desktop files
     self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
-    all_apps_by_id = self._load_apps()
+    self._apps_by_category, all_apps_by_id = self._load_apps()
 
     #   read all the user shortcuts from disk
     self._shortcuts = shortcuts.load()
@@ -64,12 +64,12 @@ class LauncherView(Gtk.Box):
     self.append(search_row)
 
     #   app grid in the middle: favorites row, then apps by category
-    app_grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+    self._app_grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
 
     self.fav_row = FavoritesRow(self, all_apps_by_id)
-    app_grid.append(self.fav_row)
+    self._app_grid.append(self.fav_row)
 
-    self._setup_app_grid(app_grid)
+    self._setup_app_grid(self._apps_by_category)
 
     #   optional bottom row for info if we're not selecting an app
     self.web_row = Gtk.Button()
@@ -82,7 +82,7 @@ class LauncherView(Gtk.Box):
     self._scroller = Gtk.ScrolledWindow()
     self._scroller.set_vexpand(True)
     self._scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    self._scroller.set_child(app_grid)
+    self._scroller.set_child(self._app_grid)
     self.append(self._scroller)
 
   def apply_config(self):
@@ -95,12 +95,25 @@ class LauncherView(Gtk.Box):
 
   def reload(self):
     """
-      make this view current with on-disk state
+      Make this view current with on-disk state: app list, config, shortcuts .
+      The grid is only rebuilt when the app set changed; otherwise we just push
+      any config change onto the existing tiles.
     """
-    self._load_apps()
-    self._shortcuts = shortcuts.load()
-    if config.reload():
+    by_category, all_apps_by_id = self._load_apps()
+    cfg_changed = config.reload()
+
+    if by_category != self._apps_by_category:
+      # update only if we've got a diff between the old and new sets of apps
+      self._apps_by_category = by_category
+      self._setup_app_grid(by_category)
+      self.fav_row.refresh(all_apps_by_id)
+
+    elif cfg_changed:
+      # update only if we've got a diff between the old and new sets of apps
       self.apply_config()
+
+    # always try shortcuts. they only load themselves if they've been updated
+    self._shortcuts = shortcuts.load()
 
   def reset(self):
     """
@@ -157,26 +170,32 @@ class LauncherView(Gtk.Box):
 
   # ----- component construction helpers -----
   def _load_apps(self):
-    self._apps_by_category = dict(cache.load_apps())
-    all_apps_by_id = {}
-    for apps in self._apps_by_category.values():
-      for a in apps:
-        all_apps_by_id[a.id] = a
-
-    return all_apps_by_id
-
-  def _setup_app_grid(self, app_grid):
     """
-      Populate app_grid with one labeled FlowBox per non-empty category.
+      Read the app cache and return (categories, apps_by_id). Pure: the caller
+      owns assignment to self, so ordering is visible at the call site.
     """
+    by_category = dict(cache.load_apps())
+    by_id = {a.id: a for apps in by_category.values() for a in apps}
+    return by_category, by_id
+
+  def _setup_app_grid(self, by_category):
+    """
+      (Re)build one labeled FlowBox per non-empty category into self._app_grid.
+      Idempotent; reads only its argument, not self state.
+    """
+    for _cat, header, flow in self._categories:
+      self._app_grid.remove(header)
+      self._app_grid.remove(flow)
+    self._categories.clear()
+
     for cat in config.CATEGORY_ORDER:
-      apps = self._apps_by_category.get(cat, [])
+      apps = by_category.get(cat, [])
       if not apps:
         continue
 
       header = Gtk.Label(label=cat, xalign=0)
       header.add_css_class("category-header")
-      app_grid.append(header)
+      self._app_grid.append(header)
 
       flow = Gtk.FlowBox()
       flow.set_max_children_per_line(config.CFG["columns"])
@@ -185,12 +204,12 @@ class LauncherView(Gtk.Box):
       flow.set_selection_mode(Gtk.SelectionMode.NONE)
       flow.set_column_spacing(6)
       flow.set_row_spacing(10)
+
       for ai in apps:
         flow.append(AppTile(ai, self))
 
-      app_grid.append(flow)
+      self._app_grid.append(flow)
       self._categories.append((cat, header, flow))
-
 
   # ----- action handlers -----
   def _on_search_changed(self, entry: Gtk.SearchEntry):
@@ -311,7 +330,8 @@ class LauncherView(Gtk.Box):
       _open_url(text)
 
     else:
-      _open_url(config.CFG["search_url"].format(quote_plus(text)))
+      # remove the placeholder {}, escape the input, and open the url
+      _open_url(config.CFG["search_url"].replace("{}", quote_plus(text)))
 
     self._drawer.dismiss()
 
