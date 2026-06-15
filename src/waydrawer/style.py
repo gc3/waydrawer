@@ -66,8 +66,9 @@ def setup_css() -> None:
   """
     load the css from the users style.css to layer on top of the default
   """
+  display = Gdk.Display.get_default()
 
-  # default CSS used no matter what
+  # default CSS, always applied
   provider = Gtk.CssProvider()
   if hasattr(provider, "load_from_string"):
     provider.load_from_string(DEFAULT_CSS.decode())
@@ -75,20 +76,20 @@ def setup_css() -> None:
   else:
     provider.load_from_data(DEFAULT_CSS, -1)
 
-    Gtk.StyleContext.add_provider_for_display(
-      Gdk.Display.get_default(),
-      provider,
-      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-    )
+  Gtk.StyleContext.add_provider_for_display(
+    display,
+    provider,
+    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+  )
 
-  # user CSS override (loaded at PRIORITY_USER so it stacks on top of defaults)
+  # user CSS override, stacks on top at higher priority
   if USER_CSS_FILE.exists():
     try:
       user_provider = Gtk.CssProvider()
       user_provider.load_from_path(str(USER_CSS_FILE))
       Gtk.StyleContext.add_provider_for_display(
-        Gdk.Display.get_default(),
-        user_provider,
+        display,
+        user_provider, 
         Gtk.STYLE_PROVIDER_PRIORITY_USER,
       )
 
