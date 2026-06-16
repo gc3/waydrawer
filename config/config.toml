@@ -1,5 +1,7 @@
 # waydrawer example config.toml -- defaults listed below
 
 columns = 6
+margin_x = 200
+margin_y = 60
 icon_size = 64
 search_url = "https://duckduckgo.com/?q={}"

@@ -20,8 +20,10 @@ CFG_MTIME = CONFIG_FILE.stat().st_mtime_ns if CONFIG_FILE.exists() else None
 
 # defaults for config file entries if we have no file
 CFG_DEFAULTS = {
-  "columns": 6,
-  "icon_size": 64,
+  "columns":    6,
+  "margin_x":   200,  # overlay inset left/right, logical px
+  "margin_y":   60,   # overlay inset top/bottom, logical px
+  "icon_size":  64,
   "search_url": "https://duckduckgo.com/?q={}",
 }
 
@@ -49,7 +51,9 @@ CATEGORY_ORDER = [
 
 # ----------- API -------------------------------------------------------------
 def load():
-  """ read the user's config file or give them the default values """
+  """
+    read the user's config file or give them the default values
+  """
   cfg = dict(CFG_DEFAULTS)
 
   if CONFIG_FILE.exists():

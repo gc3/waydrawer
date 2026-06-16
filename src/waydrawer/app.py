@@ -69,7 +69,8 @@ class WayDrawerApp(Gtk.Application):
     else:
       # window gone -> use count drops -> run() returns once any in-flight
       # launch releases its hold. quit() would kill pending launches.
-      self._window.destroy()
+      if self._window is not None:
+        self._window.destroy()
 
 
   # ----- lifecycle -----

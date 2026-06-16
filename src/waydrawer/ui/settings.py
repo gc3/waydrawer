@@ -19,7 +19,7 @@ class SettingsView(Gtk.Box):
     values and shortcuts are written straight through to disk as they happen.
   """
 
-  def __init__(self, drawer: "Drawer"):
+  def __init__(self, drawer):
     super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=18)
     self._drawer = drawer
     self.add_css_class("settings")

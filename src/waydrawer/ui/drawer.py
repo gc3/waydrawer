@@ -89,7 +89,8 @@ class Drawer(Gtk.ApplicationWindow):
       reset the various bits of ui and state when this window is shown,
       typically from the daemon
     """
-    self.show_launcher()
+    self.show_launcher()            # refreshes CFG via launcher.reload()
+    self._apply_overlay_margins()   # pick up a margin change without a restart
     self._launcher_view.reset()
 
   def show_settings(self):
@@ -132,10 +133,20 @@ class Drawer(Gtk.ApplicationWindow):
     LayerShell.set_anchor(self, LayerShell.Edge.LEFT,   True)
     LayerShell.set_anchor(self, LayerShell.Edge.RIGHT,  True)
 
-    LayerShell.set_margin(self, LayerShell.Edge.TOP, 60)
-    LayerShell.set_margin(self, LayerShell.Edge.BOTTOM, 60)
-    LayerShell.set_margin(self, LayerShell.Edge.LEFT, 200)
-    LayerShell.set_margin(self, LayerShell.Edge.RIGHT, 200)
+    self._apply_overlay_margins()
+
+  def _apply_overlay_margins(self):
+    """
+      Push the configured overlay margins (logical px) onto the layer surface.
+      Re-applied on each fresh show so config edits take effect without a
+      daemon restart.
+    """
+    mx = config.CFG["margin_x"]
+    my = config.CFG["margin_y"]
+    LayerShell.set_margin(self, LayerShell.Edge.TOP,    my)
+    LayerShell.set_margin(self, LayerShell.Edge.BOTTOM, my)
+    LayerShell.set_margin(self, LayerShell.Edge.LEFT,   mx)
+    LayerShell.set_margin(self, LayerShell.Edge.RIGHT,  mx)
 
   # ----- action handlers -----
   def _on_backdrop_clicked(self, _gesture, _n_press, x, y):

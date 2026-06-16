@@ -22,7 +22,7 @@ _OPS = {
 
 _MAX_EXP = 1000   # cap pow exponent so e.g. 9^9^9 can't build a giant int and hang
 
-def try_math(expr: str):
+def process(expr: str):
   """Evaluate expr if it looks like arithmetic. Return result string or None."""
   expr = expr.strip()
 

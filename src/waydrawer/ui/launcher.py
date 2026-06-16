@@ -21,7 +21,7 @@ from gi.repository import Gdk, GioUnix, Gio, GLib, Gtk
 from waydrawer import cache
 from waydrawer import config
 from waydrawer import favorites
-from waydrawer import math
+from waydrawer import try_math
 from waydrawer import shortcuts
 
 class LauncherView(Gtk.Box):
@@ -32,7 +32,7 @@ class LauncherView(Gtk.Box):
   """
   # pylint: disable=too-many-instance-attributes
 
-  def __init__(self, drawer: "Drawer"):
+  def __init__(self, drawer):
     super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 
     self._drawer = drawer
@@ -109,7 +109,6 @@ class LauncherView(Gtk.Box):
       self.fav_row.refresh(all_apps_by_id)
 
     elif cfg_changed:
-      # update only if we've got a diff between the old and new sets of apps
       self.apply_config()
 
     # always try shortcuts. they only load themselves if they've been updated
@@ -120,8 +119,6 @@ class LauncherView(Gtk.Box):
       fresh search and scroll position for a brand new show
     """
     self.search.set_text("")
-
-    # reset the scroll position of the window back to the start
     vadj = self._scroller.get_vadjustment()
     vadj.set_value(vadj.get_lower())
 
@@ -261,7 +258,7 @@ class LauncherView(Gtk.Box):
     if (sc := shortcuts.match(self._shortcuts, raw, exact=False)):
       self.web_row.set_label(f"  Open Shortcut '{sc[0]}'")
 
-    elif (result := math.try_math(raw)) is not None:
+    elif (result := try_math.process(raw)) is not None:
       self.web_row.set_label(f"  Math result is {result}")
 
     elif _looks_like_url(raw):
@@ -316,11 +313,11 @@ class LauncherView(Gtk.Box):
       self.launch_shortcut_and_hide(sc[1])
       return
 
-    if (result := math.try_math(text)) is not None:
+    if (result := try_math.process(text)) is not None:
       out = str(result)
       if shutil.which("wl-copy"):
         # copy the results to the clipboard for convenience
-        subprocess.run(["wl-copy", "--", out], check=False)
+        subprocess.run(["wl-copy", "--", out], check=False, env=_child_env())
 
       else:
         # fallback: best-effort, may not survive focus loss on layer-shell
@@ -434,7 +431,7 @@ class AppTile(Gtk.Button):
 
     label = Gtk.Label(label=app_info.get_display_name() or "?")
     label.set_max_width_chars(14)
-    label.set_ellipsize(3)
+    label.set_ellipsize(3) # PANGO_ELLIPSIZE_END
     label.set_justify(Gtk.Justification.CENTER)
     label.set_wrap(True)
     label.set_lines(2)
