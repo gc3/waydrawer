@@ -48,6 +48,14 @@ entry:focus { background-color: rgba(255,255,255,0.10); }
 .app-tile:active { background-color: rgba(255,255,255,0.12); }
 .app-tile label  { color: #e6e6ec; font-size: 12px; }
 
+.running-dot {
+  min-width: 6px;
+  min-height: 6px;
+  border-radius: 3px;
+  background-color: #89b4fa;
+  margin-top: 3px;
+}
+
 .web-fallback {
   padding: 12px;
   border-radius: 10px;

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 import os
 import shutil
@@ -40,6 +41,7 @@ class LauncherView(Gtk.Box):
     # Data:
     #   load in all the app data from the .desktop files
     self._categories: list[tuple[str, Gtk.Label, Gtk.FlowBox]] = []
+    self._running: set[str] = set()
     self._apps_by_category, all_apps_by_id = self._load_apps()
 
     #   read all the user shortcuts from disk
@@ -114,6 +116,9 @@ class LauncherView(Gtk.Box):
     # always try shortcuts. they only load themselves if they've been updated
     self._shortcuts = shortcuts.load()
 
+    # flag apps that already have a window open
+    self.refresh_running()
+
   def reset(self):
     """
       fresh search and scroll position for a brand new show
@@ -164,6 +169,22 @@ class LauncherView(Gtk.Box):
 
     Gio.AppInfo.launch_default_for_uri_async(uri, _launch_ctx(), None, _held(finish))
     self._drawer.dismiss()
+
+  def refresh_running(self):
+    """
+      Flag apps with an open window. Called on each show; cheap snapshot via
+      hyprctl, no live subscription.
+    """
+    self._running = _running_classes()
+    self.fav_row.mark_running(self._running)
+    for _cat, _h, flow in self._categories:
+      _mark_flow_running(flow, self._running)
+
+  def running_set(self) -> set[str]:
+    """
+      Window classes flagged running as of the last refresh_running().
+    """
+    return self._running
 
   # ----- component construction helpers -----
   def _load_apps(self):
@@ -384,6 +405,17 @@ class FavoritesRow(Gtk.Box):
       if (ai := self._all_apps_by_id.get(app_id)):
         self._fav_flow.append(AppTile(ai, self._launcher))
 
+    self.mark_running(self._launcher.running_set())   # keep dots across rebuilds
+
+  def refresh(self, apps_by_id: dict):
+    """
+      App set changed on disk: adopt the new map, drop favorites whose app is
+      gone, and rebuild.
+    """
+    self._all_apps_by_id = apps_by_id
+    self._fav_apps_by_id = [i for i in self._fav_apps_by_id if i in apps_by_id]
+    self.rebuild()
+
   def toggle_app(self, app_id: str):
     """
       Pin/unpin an app, then persist and refresh.
@@ -403,6 +435,12 @@ class FavoritesRow(Gtk.Box):
     """
     self.set_visible(not is_searching and bool(self._fav_apps_by_id))
 
+  def mark_running(self, running: set[str]):
+    """
+      Push running state onto favorite tiles.
+    """
+    _mark_flow_running(self._fav_flow, running)
+
 
 # ----------- Tiles (grid entries) --------------------------------------------
 class AppTile(Gtk.Button):
@@ -420,6 +458,7 @@ class AppTile(Gtk.Button):
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     box.set_halign(Gtk.Align.CENTER)
 
+    # add the app's icon
     self._icon = Gtk.Image()
     if gicon := app_info.get_icon():
       self._icon.set_from_gicon(gicon)
@@ -429,6 +468,7 @@ class AppTile(Gtk.Button):
 
     box.append(self._icon)
 
+    # add the text name
     label = Gtk.Label(label=app_info.get_display_name() or "?")
     label.set_max_width_chars(14)
     label.set_ellipsize(3) # PANGO_ELLIPSIZE_END
@@ -436,6 +476,13 @@ class AppTile(Gtk.Button):
     label.set_wrap(True)
     label.set_lines(2)
     box.append(label)
+
+    # add a dot to indicate a running app
+    self._dot = Gtk.Box()
+    self._dot.add_css_class("running-dot")
+    self._dot.set_halign(Gtk.Align.CENTER)
+    self._dot.set_opacity(0.0)   # reserve space; opacity toggle avoids reflow
+    box.append(self._dot)
 
     self.set_child(box)
     self.connect("clicked", lambda _b: launcher.launch_app_and_hide(app_info))
@@ -454,6 +501,12 @@ class AppTile(Gtk.Button):
       re-apply config values baked in at construction
     """
     self._icon.set_pixel_size(config.CFG["icon_size"])
+
+  def set_running(self, is_running: bool):
+    """
+      Toggle the running-window indicator.
+    """
+    self._dot.set_opacity(1.0 if is_running else 0.0)
 
   def _on_right_click(self, _gesture, _n_press, _x, _y):
     """
@@ -585,3 +638,52 @@ def _child_env() -> dict[str, str]:
       env.pop(var, None)
 
   return env
+
+# --- running-app detection ---
+def _running_classes() -> set[str]:
+  """
+    Lowercased window classes currently open under Hyprland (class +
+    initialClass). Empty set on any failure -> no indicators, never a crash.
+  """
+  try:
+    out = subprocess.run(
+      ["hyprctl", "clients", "-j"],
+      capture_output=True, text=True, env=_child_env(),
+      timeout=1.0, check=True,
+    ).stdout
+    clients = json.loads(out)
+
+  except (OSError, subprocess.SubprocessError, ValueError):
+    return set()
+
+  classes = set()
+  for c in clients:
+    for key in ("class", "initialClass"):
+      if v := (c.get(key) or "").lower():
+        classes.add(v)
+
+  return classes
+
+def _is_running(ai, running: set[str]) -> bool:
+  """
+    True if this app has an open window. Prefer StartupWMClass; fall back to the
+    desktop-id stem and its last reverse-DNS component (firefox.desktop ->
+    firefox; org.mozilla.firefox -> firefox).
+  """
+  if not running:
+    return False
+
+  if (wm := ai.get_startup_wm_class().lower()) and wm in running:
+    return True
+
+  stem = ai.get_id().removesuffix(".desktop").lower()
+  return stem in running or stem.rsplit(".", 1)[-1] in running
+
+def _mark_flow_running(flow, running):
+  """
+    Push running state onto every tile in a FlowBox.
+  """
+  child = flow.get_first_child()
+  while child is not None:
+    child.get_child().set_running(_is_running(child.get_child().app_info, running))
+    child = child.get_next_sibling()

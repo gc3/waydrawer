@@ -26,6 +26,7 @@ class AppInfo:
   comment: str = ""
   icon: str = ""
   commandline: str = ""
+  startup_wm_class: str = ""
   categories: List[str] = field(default_factory=list)
   keywords: List[str] = field(default_factory=list)
 
@@ -38,6 +39,7 @@ class AppInfo:
   def get_generic_name(self) -> str:      return self.generic_name
   def get_description(self) -> str:       return self.comment
   def get_commandline(self) -> str:       return self.commandline
+  def get_startup_wm_class(self) -> str:  return self.startup_wm_class
   def get_categories(self) -> List[str]:  return self.categories
   def get_keywords(self) -> List[str]:    return self.keywords
 

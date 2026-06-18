@@ -20,7 +20,7 @@ def load() -> list[str]:
     return []
 
 def save(ids: list[str]) -> None:
-  """ 
+  """
     Write out favorites to the config directory
   """
   CONFIG_DIR.mkdir(parents=True, exist_ok=True)

@@ -18,7 +18,7 @@ from waydrawer.config import CATEGORY_MAP, CATEGORY_ORDER
 
 CACHE_DIR = Path(GLib.get_user_cache_dir()) / "waydrawer"
 APPS_CACHE = CACHE_DIR / "apps.json"
-CACHE_VERSION = 3  # bump if you change the schema
+CACHE_VERSION = 4  # bump if you change the schema
 
 
 # ----------- API -------------------------------------------------------------
@@ -77,6 +77,7 @@ def _serialize(info):
     comment = info.get_description() or "",
     icon = info.get_string("Icon") or "",
     commandline = info.get_commandline() or "",
+    startup_wm_class = info.get_startup_wm_class() or "",
     categories = [c for c in (info.get_categories() or "").split(";") if c],
     keywords = [k for k in (info.get_string("Keywords") or "").split(";") if k],
   )
