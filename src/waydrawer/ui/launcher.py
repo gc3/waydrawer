@@ -25,6 +25,7 @@ from waydrawer import favorites
 from waydrawer import try_math
 from waydrawer import shortcuts
 
+# ----------- Launcher (app grid + search bar) ---------------------------------
 class LauncherView(Gtk.Box):
   """
     Full-surface launcher page: the search bar + app grid + clickable action
@@ -354,7 +355,7 @@ class LauncherView(Gtk.Box):
     self._drawer.dismiss()
 
 
-# ----------- Rows (drawer sections) ------------------------------------------
+# ----------- Rows (app grid sections) ------------------------------------------
 class FavoritesRow(Gtk.Box):
   """
     Self-contained favorites section: header + tile grid + the pinned-id list.
@@ -444,7 +445,7 @@ class FavoritesRow(Gtk.Box):
     """
     _mark_flow_running(self._fav_flow, running)
 
-  # --- internal helpers ---
+  # ---- internal helpers ----
   def _wire_reorder(self, tile, app_id: str):
     """
       Make a favorite tile draggable onto its siblings to reorder. Only

@@ -82,8 +82,10 @@ class WayDrawerApp(Gtk.Application):
 
     if not LayerShell.is_supported():
       print(
-        "[waydrawer] this compositor does not support wlr-layer-shell; "
-        "waydrawer requires a wlroots-based compositor (Sway, Hyprland, niri, …).",
+        "[waydrawer] this compositor does not implement the "
+        "wlr-layer-shell protocol, which waydrawer requires. "
+        "Supported compositors include Hyprland, Sway, niri, and KWin; "
+        "GNOME/Mutter is not supported.",
         file=sys.stderr,
       )
       sys.exit(1)
