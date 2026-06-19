@@ -17,7 +17,7 @@ from urllib.parse import quote_plus
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("GioUnix", "2.0")
-from gi.repository import Gdk, GioUnix, Gio, GLib, Gtk
+from gi.repository import Gdk, GioUnix, Gio, GLib, GObject, Gtk
 
 from waydrawer import cache
 from waydrawer import config
@@ -401,9 +401,12 @@ class FavoritesRow(Gtk.Box):
       child = nxt
 
     self.set_visible(bool(self._fav_apps_by_id))
+
     for app_id in self._fav_apps_by_id:
       if (ai := self._all_apps_by_id.get(app_id)):
-        self._fav_flow.append(AppTile(ai, self._launcher))
+        tile = AppTile(ai, self._launcher)
+        self._wire_reorder(tile, app_id)
+        self._fav_flow.append(tile)
 
     self.mark_running(self._launcher.running_set())   # keep dots across rebuilds
 
@@ -441,6 +444,48 @@ class FavoritesRow(Gtk.Box):
     """
     _mark_flow_running(self._fav_flow, running)
 
+  # --- internal helpers ---
+  def _wire_reorder(self, tile, app_id: str):
+    """
+      Make a favorite tile draggable onto its siblings to reorder. Only
+      favorites are wired; category tiles stay inert. Primary-button drag only,
+      so the right-click pin/unpin gesture is untouched.
+    """
+    drag = Gtk.DragSource()
+    drag.set_actions(Gdk.DragAction.MOVE)
+    drag.connect(
+      "prepare",
+      lambda _s, _x, _y, aid=app_id: Gdk.ContentProvider.new_for_value(aid)
+    )
+    drag.connect(
+      "drag-begin",
+      lambda s, _d, t=tile: s.set_icon(Gtk.WidgetPaintable.new(t), 0, 0)
+    )
+    tile.add_controller(drag)
+
+    drop = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.MOVE)
+    drop.connect(
+      "drop",
+      lambda _t, src_id, _x, _y, dst=app_id: self._reorder(src_id, dst)
+    )
+    tile.add_controller(drop)
+
+  def _reorder(self, src_id: str, dst_id: str) -> bool:
+    """
+      Move src_id into dst_id's slot, persist, rebuild. Returns True if the
+      order changed (the drop's accepted/rejected result).
+    """
+    if src_id == dst_id or src_id not in self._fav_apps_by_id:
+      return False
+
+    self._fav_apps_by_id.remove(src_id)
+    dst = (self._fav_apps_by_id.index(dst_id)
+           if dst_id in self._fav_apps_by_id else len(self._fav_apps_by_id))
+    self._fav_apps_by_id.insert(dst, src_id)
+
+    favorites.save(self._fav_apps_by_id)
+    self.rebuild()
+    return True
 
 # ----------- Tiles (grid entries) --------------------------------------------
 class AppTile(Gtk.Button):
