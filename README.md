@@ -8,35 +8,37 @@ Inspired by the GNOME app drawer, which I couldn't find a standalone version of 
 
 Tested on Hyprland.
 
-## What it does
+![WayDrawer app grid](assets/app-grid.png)
 
-- Search your installed apps, grouped by category
-- Pin favorite apps to the top
+
+## Features
+
+### What it does
+
+- Search your installed apps with live filtering, grouped by category
+- Pin/unpin a favorite with a right-click; favorites appear first
 - Do basic arithmetic right in the search bar (result copied to the clipboard)
 - Open a URL in your browser if the input looks like one
 - Fall back to a web search when nothing else matches
 - Save named **shortcuts** that get handed to `xdg-open`
 - Edit config and shortcuts from a built-in **settings** view
 - Optional **daemon mode** for near-instant open times
-
-## Features
-
-- Reads `.desktop` files (cached between runs) to find all your apps
-- Apps grouped by category (Internet, Office, etc.)
-- Live filter as you type — matches name, generic name, and keywords
-- Pin/unpin a favorite with a right-click; favorites appear first
-- Web-search fallback when no app matches (Enter, or click the row)
-- Opens the input in your browser when it looks like a URL
-- Evaluates basic arithmetic in the search bar and copies the result
-- Settings view (gear icon, or `waydrawer --settings`) for editing config
-  values and shortcuts without leaving the drawer
-- Shortcuts are plain TOML — hand-edit them or use the settings view; comments
-  you add by hand are preserved
-- Layer-shell overlay: `Esc` closes (or backs out of settings first), `Enter`
-  launches the first visible match
-- Daemon mode over a Unix socket so the client opens almost instantly
 - CSS styling of the GTK components (with examples)
-- TOML config file for basic customization (columns, icon size, etc)
+
+### Favorites
+Pin frequently-used apps to the top.
+
+![Favorites](assets/favorites.png)
+
+### Type-ahead search
+Start typing to filter instantly.
+
+![Type-ahead search](assets/typeahead.png)
+
+### Settings
+Configure shortcuts and behavior in-app.
+
+![Settings](assets/settings.png)
 
 ## Dependencies
 
