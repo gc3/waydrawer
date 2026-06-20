@@ -15,15 +15,15 @@ Tested on Hyprland.
 
 ### Overview
 
-- Search your installed apps with live filtering, grouped by category
+- Search installed apps with live filtering, grouped by category
 - Pin/unpin a favorite with a right-click; favorites appear first
-- Do basic arithmetic right in the search bar (result copied to the clipboard)
+- Do basic arithmetic right in the search bar
 - Open a URL in your browser if the input looks like one
 - Fall back to a web search when nothing else matches
 - Save named **shortcuts** that get handed to `xdg-open`
 - Edit config and shortcuts from a built-in **settings** view
 - Optional **daemon mode** for near-instant open times
-- CSS styling of the GTK components (with examples)
+- CSS styling of the GTK components 
 
 ### Screenshots
 Pin frequently-used apps to the top.
