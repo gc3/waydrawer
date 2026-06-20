@@ -13,7 +13,7 @@ Tested on Hyprland.
 
 ## Features
 
-### What it does
+### Overview
 
 - Search your installed apps with live filtering, grouped by category
 - Pin/unpin a favorite with a right-click; favorites appear first
@@ -25,17 +25,15 @@ Tested on Hyprland.
 - Optional **daemon mode** for near-instant open times
 - CSS styling of the GTK components (with examples)
 
-### Favorites
+### Screenshots
 Pin frequently-used apps to the top.
 
 ![Favorites](assets/favorites.png)
 
-### Type-ahead search
 Start typing to filter instantly.
 
 ![Type-ahead search](assets/typeahead.png)
 
-### Settings
 Configure shortcuts and behavior in-app.
 
 ![Settings](assets/settings.png)
