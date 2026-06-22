@@ -47,9 +47,6 @@ Runtime:
 - wlr-layer-shell protocol in the wayland compositor (ie, not Gnome/Mutter)
 - `wl-clipboard` (clipboard writes), `xdg-utils` (`xdg-open` for shortcuts)
 
-
-`tomlkit` is vendored into the build, so you don't need to install it.
-
 On Ubuntu:
 
 ```sh
