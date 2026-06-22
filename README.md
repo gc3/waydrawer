@@ -55,7 +55,7 @@ sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0 python3-set
 
 ## Install
 
-Builds the zipapp (vendoring `tomlkit`) and installs it to `~/.local/bin/waydrawer`:
+Builds the app and installs it to `~/.local/bin/waydrawer`:
 
 ```sh
 make install
