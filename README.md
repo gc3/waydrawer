@@ -23,7 +23,7 @@ Tested on Hyprland.
 - Save named **shortcuts** that get handed to `xdg-open`
 - Edit config and shortcuts from a built-in **settings** view
 - Optional **daemon mode** for near-instant open times
-- CSS styling of the GTK components 
+- CSS styling of the GTK components
 
 ### Screenshots
 Pin frequently-used apps to the top.
@@ -58,10 +58,38 @@ sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0 python3-set
 Builds the app and installs it to `~/.local/bin/waydrawer`:
 
 ```sh
+git clone https://github.com/gc3/waydrawer.git
+cd waydrawer
 make install
 ```
 
 Override the location with `PREFIX` if you like: `make install PREFIX=/usr/local`.
+
+## Running waydrawer
+Start the daemon (typically from your compositor autostart):
+```sh
+waydrawer --daemon
+```
+
+With a daemon running, `waydrawer` (or with `--toggle`) shows the drawer instantly.  Without a daemon, each invocation is a slower, one-shot launch.
+```sh
+waydrawer toggle
+```
+
+Usage:
+```
+$ waydrawer -h
+usage: waydrawer [-h] [-d | -q | -t | -s]
+
+GTK4 app drawer for Wayland.
+
+options:
+  -h, --help      show this help message and exit
+  -d, --daemon    run as a daemon: build the drawer once, show/hide on request
+  -q, --quit      tell a running daemon to exit
+  -t, --toggle    toggle the waydrawer ui
+  -s, --settings  open waydrawer on the settings view
+```
 
 ## Keybindings
 
@@ -74,7 +102,7 @@ bind = SUPER, Space, exec, waydrawer
 Hyprland (Lua):
 
 ```lua
-hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer"))
+hl.bind("SUPER + Space", hl.dsp.exec_cmd("waydrawer --toggle"))
 ```
 
 ## Configuration
@@ -97,23 +125,3 @@ Example files to copy from are in `config/`:
 - `config/config.toml`
 - `config/shortcuts.toml`
 - `config/style.css`
-
-## Running waydrawer
-
-```
-$ waydrawer -h
-usage: waydrawer [-h] [-d | -q | -t | -s]
-
-GTK4 app drawer for Wayland.
-
-options:
-  -h, --help      show this help message and exit
-  -d, --daemon    run as a daemon: build the drawer once, show/hide on request
-  -q, --quit      tell a running daemon to exit
-  -t, --toggle    toggle the waydrawer ui
-  -s, --settings  open waydrawer on the settings view
-```
-
-With a daemon running, `waydrawer` (or `--toggle`) shows the drawer instantly. `--settings` opens it straight to the settings view.
-
-Without a daemon, each invocation is a slower, one-shot launch.
