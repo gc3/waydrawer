@@ -383,6 +383,7 @@ class FavoritesRow(Gtk.Box):
     self._fav_flow.set_row_spacing(10)
     self.append(self._fav_flow)
 
+    self.add_css_class("favorites-row")
     self.rebuild()
 
   def apply_config(self):
