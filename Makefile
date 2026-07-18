@@ -10,7 +10,7 @@ $(PYZ): $(SOURCES)
 	mkdir -p $(STAGING) dist
 	cp -r src/waydrawer $(STAGING)/
 	pip install --target $(STAGING) --no-compile tomlkit
-	python -m zipapp $(STAGING) -o $(PYZ) -m "waydrawer.__main__:main" -p '/usr/bin/env python3'
+	python3 -m zipapp $(STAGING) -o $(PYZ) -m "waydrawer.__main__:main" -p '/usr/bin/env python3'
 
 tags:
 	ctags -R --languages=Python --fields=+l --extras=+q --python-kinds=-i src/
