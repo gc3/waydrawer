@@ -3,7 +3,6 @@
 window {
   background-color: rgba(20, 22, 28, 0.94);
   font-family: "Adwaita Sans";
-  font-size: 14px;
 }
 
 /* search bar */
@@ -34,7 +33,6 @@ scrollbar slider {
 /* app grid category name */
 .category-header {
   color: #CB8EA9;
-  font-size: 14pt;
   margin-top: 6px;
   margin-bottom: 2px;
 }
@@ -54,10 +52,6 @@ scrollbar slider {
 
 .app-tile:hover label  {
   color: #CB8EA9;
-}
-
-.app-tile label  {
-  font-size:  11pt;
 }
 
 /* non-app results section */

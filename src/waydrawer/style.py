@@ -20,7 +20,7 @@ DEFAULT_CSS = b"""
 window { background-color: rgba(20, 22, 28, 0.94); }
 
 entry {
-  font-size: 12pt;
+  font-size: 1.3em;
   padding: 12px;
   border-radius: 10px;
   background-color: transparent;
@@ -30,7 +30,7 @@ entry {
 entry:focus { background-color: rgba(255,255,255,0.10); }
 
 .category-header {
-  font-size: 9pt;
+  font-size: 1.3em;
   font-weight: 700;
   color: #99a;
   letter-spacing: 0.08em;
@@ -46,7 +46,7 @@ entry:focus { background-color: rgba(255,255,255,0.10); }
 }
 .app-tile:hover  { background-color: rgba(255,255,255,0.07); }
 .app-tile:active { background-color: rgba(255,255,255,0.12); }
-.app-tile label  { color: #e6e6ec; font-size:  9pt; }
+.app-tile label  { color: #e6e6ec; }
 
 .running-dot {
   min-width: 6px;
